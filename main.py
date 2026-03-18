@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-import subprocess, os, tempfile, base64, requests
+import subprocess, os, tempfile, requests
 
 app = Flask(__name__)
 
@@ -37,7 +37,6 @@ def download():
     filepath = lines[0]
     file_size = os.path.getsize(filepath)
 
-    # Upload to file.io and get a URL back
     with open(filepath, 'rb') as f:
         upload = requests.post(
             'https://file.io/?expires=1d',
@@ -64,6 +63,3 @@ def health():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-Commit it → wait for Railway green → come back to n8n and click Execute step again.
-This time instead of sending the whole video through n8n, Railway downloads it, uploads it to file.io, and just returns a short URL. Much lighter on memory.
-Tell me when Railway is green. Sonnet 4.6
