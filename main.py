@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-import subprocess, os, tempfile, base64
+import subprocess, os, tempfile, base64, requests
 
 app = Flask(__name__)
 
@@ -14,11 +14,10 @@ def download():
 
     cmd = [
         'yt-dlp',
-        '--format', 'best[height<=720][ext=mp4]/best[height<=720]/best',
+        '--format', 'best[height<=480][ext=mp4]/best[height<=480]/worst',
         '--no-playlist',
         '--no-check-certificate',
         '--extractor-retries', '5',
-        '--sleep-interval', '2',
         '--cookies', '/app/cookies.txt',
         '--output', out_template,
         '--print', 'after_move:filepath',
@@ -32,21 +31,30 @@ def download():
     if not lines:
         return jsonify({
             'error': 'No clip found',
-            'stdout': result.stdout,
-            'stderr': result.stderr[-3000:]
+            'stderr': result.stderr[-2000:]
         }), 400
 
     filepath = lines[0]
+    file_size = os.path.getsize(filepath)
 
+    # Upload to file.io and get a URL back
     with open(filepath, 'rb') as f:
-        video_b64 = base64.b64encode(f.read()).decode()
+        upload = requests.post(
+            'https://file.io/?expires=1d',
+            files={'file': (os.path.basename(filepath), f, 'video/mp4')}
+        )
 
     os.remove(filepath)
 
+    if not upload.ok:
+        return jsonify({'error': 'Upload failed', 'details': upload.text}), 500
+
+    result_json = upload.json()
     return jsonify({
         'success': True,
-        'video_base64': video_b64,
-        'filename': os.path.basename(filepath)
+        'video_url': result_json.get('link'),
+        'filename': os.path.basename(filepath),
+        'size_bytes': file_size
     })
 
 @app.route('/health', methods=['GET'])
@@ -56,3 +64,6 @@ def health():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+Commit it → wait for Railway green → come back to n8n and click Execute step again.
+This time instead of sending the whole video through n8n, Railway downloads it, uploads it to file.io, and just returns a short URL. Much lighter on memory.
+Tell me when Railway is green. Sonnet 4.6
