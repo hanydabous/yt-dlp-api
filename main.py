@@ -7,28 +7,32 @@ app = Flask(__name__)
 def download():
     data = request.json
     query = data.get('query', '')
-    duration_max = data.get('duration_max', 60)
 
-    search_term = f"ytsearch5:{query}"
+    search_term = f"ytsearch1:{query}"
     out_dir = tempfile.mkdtemp()
     out_template = os.path.join(out_dir, '%(id)s.%(ext)s')
 
     cmd = [
         'yt-dlp',
-        '--format', 'bestvideo[height<=1080][ext=mp4]+bestaudio/best[height<=1080]',
-        '--merge-output-format', 'mp4',
-        '--match-filter', f'duration < {duration_max}',
+        '--format', 'best[height<=720][ext=mp4]/best[height<=720]/best',
         '--no-playlist',
+        '--no-check-certificate',
+        '--extractor-retries', '3',
         '--output', out_template,
         '--print', 'after_move:filepath',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         search_term
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
     lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip().endswith('.mp4')]
 
     if not lines:
-        return jsonify({'error': 'No clip found', 'details': result.stderr}), 400
+        return jsonify({
+            'error': 'No clip found',
+            'stdout': result.stdout,
+            'stderr': result.stderr[-2000:]
+        }), 400
 
     filepath = lines[0]
 
