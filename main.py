@@ -3,6 +3,18 @@ import subprocess, os, tempfile, base64
 
 app = Flask(__name__)
 
+def write_cookies():
+    cookies = os.environ.get('YOUTUBE_COOKIES', '')
+    if not cookies:
+        return None
+    cookie_path = '/tmp/cookies.txt'
+    with open(cookie_path, 'w') as f:
+        # Make sure Netscape header is present
+        if not cookies.startswith('# Netscape'):
+            f.write('# Netscape HTTP Cookie File\n')
+        f.write(cookies)
+    return cookie_path
+
 @app.route('/download', methods=['POST'])
 def download():
     data = request.json
@@ -12,17 +24,24 @@ def download():
     out_dir = tempfile.mkdtemp()
     out_template = os.path.join(out_dir, '%(id)s.%(ext)s')
 
+    cookie_path = write_cookies()
+
     cmd = [
         'yt-dlp',
         '--format', 'best[height<=720][ext=mp4]/best[height<=720]/best',
         '--no-playlist',
         '--no-check-certificate',
-        '--extractor-retries', '3',
+        '--extractor-retries', '5',
+        '--sleep-interval', '2',
         '--output', out_template,
         '--print', 'after_move:filepath',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        search_term
     ]
+
+    if cookie_path:
+        cmd += ['--cookies', cookie_path]
+
+    cmd.append(search_term)
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
     lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip().endswith('.mp4')]
@@ -31,7 +50,7 @@ def download():
         return jsonify({
             'error': 'No clip found',
             'stdout': result.stdout,
-            'stderr': result.stderr[-2000:]
+            'stderr': result.stderr[-3000:]
         }), 400
 
     filepath = lines[0]
