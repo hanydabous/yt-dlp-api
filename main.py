@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
 CHAT_ID = "8388528228"
-ANTHROPIC_KEY = os.environ.get("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", "")
+ANTHROPIC_KEY = os.environ.get("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", "")
 
 MUSIC_TRACKS = [
     "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
