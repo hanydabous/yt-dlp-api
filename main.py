@@ -4,7 +4,6 @@ import subprocess, os, tempfile, requests
 app = Flask(__name__)
 
 PROXY = "http://hrwmqwzu:aznd3fx6nczr@31.59.20.176:6754"
-SHOTSTACK_KEY = "Ymna74p8i5tavuS2aO7LPEAPGjBAZBf1KhHiK0TC"
 
 @app.route('/download', methods=['POST'])
 def download():
@@ -24,14 +23,14 @@ def download():
         '--cookies', '/app/cookies.txt',
         '--proxy', PROXY,
         '--remote-components', 'ejs:github',
-        '--max-filesize', '50m',
+        '--max-filesize', '20m',
         '--output', out_template,
         '--print', 'after_move:filepath',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         search_term
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=480)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
     lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip().endswith('.mp4')]
 
     if not lines:
@@ -44,43 +43,21 @@ def download():
         with open(filepath, 'rb') as f:
             file_data = f.read()
 
-        public_url = ''
-        try:
-            tmp = requests.post(
-                'https://catbox.moe/user/api.php',
-                data={'reqtype': 'fileupload'},
-                files={'fileToUpload': (filename, file_data, 'video/mp4')},
-                timeout=120
-            )
-            if tmp.ok:
-                public_url = tmp.text.strip()
-        except:
-            pass
+        os.remove(filepath)
 
-        upload_req = requests.post(
-            'https://api.shotstack.io/ingest/stage/upload',
-            headers={'x-api-key': SHOTSTACK_KEY, 'Content-Type': 'application/json'},
-            json={'filename': filename},
-            timeout=30
+        tmp = requests.post(
+            'https://catbox.moe/user/api.php',
+            data={'reqtype': 'fileupload'},
+            files={'fileToUpload': (filename, file_data, 'video/mp4')},
+            timeout=120
         )
 
-        shotstack_url = ''
-        source_id = ''
-        if upload_req.ok:
-            upload_data = upload_req.json()
-            put_url = upload_data.get('data', {}).get('attributes', {}).get('url', '')
-            source_id = upload_data.get('data', {}).get('id', '')
-            if put_url:
-                requests.put(put_url, data=file_data, timeout=300)
-                shotstack_url = f"shotstack:{source_id}"
-
-        os.remove(filepath)
+        if not tmp.ok or not tmp.text.strip().startswith('https'):
+            return jsonify({'error': 'Upload failed', 'details': tmp.text}), 500
 
         return jsonify({
             'success': True,
-            'public_url': public_url,
-            'shotstack_url': shotstack_url,
-            'source_id': source_id,
+            'public_url': tmp.text.strip(),
             'filename': filename
         })
 
