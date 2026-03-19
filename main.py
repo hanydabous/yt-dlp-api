@@ -1,11 +1,13 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 import subprocess, os, tempfile
 
 app = Flask(__name__)
 
 PROXY = "http://hrwmqwzu:aznd3fx6nczr@45.61.118.112:5809"
-STORE = '/tmp/videos'
-os.makedirs(STORE, exist_ok=True)
+BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
+CHAT_ID = "8388528228"
+
+import requests
 
 @app.route('/download', methods=['POST'])
 def download():
@@ -40,23 +42,37 @@ def download():
 
     filepath = lines[0]
     filename = os.path.basename(filepath)
-    dest = os.path.join(STORE, filename)
-    os.rename(filepath, dest)
 
-    public_url = f'https://web-production-32cbf.up.railway.app/serve/{filename}'
+    try:
+        with open(filepath, 'rb') as f:
+            tg = requests.post(
+                f'https://api.telegram.org/bot{BOT_TOKEN}/sendVideo',
+                data={
+                    'chat_id': CHAT_ID,
+                    'caption': f'New clip ready!\n\nPress POST or SKIP',
+                    'reply_markup': '{"inline_keyboard":[[{"text":"✅ POST","callback_data":"post"},{"text":"❌ SKIP","callback_data":"skip"}]]}'
+                },
+                files={'video': (filename, f, 'video/mp4')},
+                timeout=120
+            )
 
-    return jsonify({
-        'success': True,
-        'public_url': public_url,
-        'filename': filename
-    })
+        os.remove(filepath)
 
-@app.route('/serve/<filename>', methods=['GET'])
-def serve(filename):
-    path = os.path.join(STORE, filename)
-    if os.path.exists(path):
-        return send_file(path, mimetype='video/mp4')
-    return 'Not found', 404
+        if tg.ok:
+            tg_data = tg.json()
+            file_id = tg_data.get('result', {}).get('video', {}).get('file_id', '')
+            return jsonify({
+                'success': True,
+                'file_id': file_id,
+                'filename': filename
+            })
+        else:
+            return jsonify({'error': 'Telegram send failed', 'details': tg.text}), 500
+
+    except Exception as e:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
