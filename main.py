@@ -47,13 +47,13 @@ def download():
         public_url = ''
         try:
             tmp = requests.post(
-                'https://tmpfiles.org/api/v1/upload',
-                files={'file': (filename, file_data, 'video/mp4')},
-                timeout=60
+                'https://catbox.moe/user/api.php',
+                data={'reqtype': 'fileupload'},
+                files={'fileToUpload': (filename, file_data, 'video/mp4')},
+                timeout=120
             )
             if tmp.ok:
-                raw = tmp.json().get('data', {}).get('url', '')
-                public_url = raw.replace('tmpfiles.org/', 'tmpfiles.org/dl/')
+                public_url = tmp.text.strip()
         except:
             pass
 
