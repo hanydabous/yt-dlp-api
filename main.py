@@ -3,6 +3,22 @@ import subprocess, os, tempfile, requests
 
 app = Flask(__name__)
 
+def setup_deno():
+    if not os.path.exists('/root/.deno/bin/deno'):
+        subprocess.run(
+            'curl -fsSL https://deno.land/install.sh | sh',
+            shell=True, capture_output=True
+        )
+    deno_path = '/root/.deno/bin/deno'
+    if os.path.exists(deno_path):
+        current_path = os.environ.get('PATH', '')
+        if '/root/.deno/bin' not in current_path:
+            os.environ['PATH'] = f'/root/.deno/bin:{current_path}'
+        return True
+    return False
+
+setup_deno()
+
 @app.route('/download', methods=['POST'])
 def download():
     data = request.json
