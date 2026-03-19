@@ -44,7 +44,6 @@ def download():
     filename = os.path.basename(filepath)
 
     try:
-        # Get signed URL immediately after download
         upload_req = requests.post(
             'https://api.shotstack.io/ingest/stage/upload',
             headers={
@@ -67,7 +66,6 @@ def download():
             os.remove(filepath)
             return jsonify({'error': 'No URL in response', 'response': upload_data}), 500
 
-        # Upload immediately - read entire file into memory first for speed
         with open(filepath, 'rb') as f:
             file_data = f.read()
 
@@ -76,10 +74,6 @@ def download():
         put = requests.put(
             put_url,
             data=file_data,
-            headers={
-                'Content-Type': 'video/mp4',
-                'Content-Length': str(len(file_data))
-            },
             timeout=300
         )
 
