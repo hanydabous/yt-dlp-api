@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y curl unzip ffmpeg fonts-dejavu-core
 
-RUN pip install flask yt-dlp requests Pillow
+RUN pip install flask yt-dlp requests Pillow gdown
 
 RUN curl -fsSL https://deno.land/install.sh | sh
 
