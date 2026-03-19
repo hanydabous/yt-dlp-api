@@ -5,10 +5,10 @@ import json, base64
 
 app = Flask(__name__)
 
-PROXY = "http://hrwmqwzu:aznd3fx6nczr@45.61.118.112:5809"
 BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
 CHAT_ID = "8388528228"
 ANTHROPIC_KEY = os.environ.get("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", "")
+GDRIVE_FOLDER_ID = "1q3pmO2X31IE8lyzA6LuGIMHIwVAQvY5j"
 
 MUSIC_TRACKS = [
     "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
@@ -16,63 +16,79 @@ MUSIC_TRACKS = [
     "https://cdn.pixabay.com/audio/2021/11/13/audio_cb4f5da9a6.mp3",
 ]
 
-SEARCH_QUERIES = [
-    "Suits Harvey Specter negotiation scene short clip",
-    "Mad Men Don Draper pitch scene short clip",
-    "Wolf of Wall Street Jordan Belfort sales scene",
-    "Billions Bobby Axelrod trading scene short",
-    "Breaking Bad Walter White business scene short",
-    "Glengarry Glen Ross sales speech scene",
-    "Wall Street Gordon Gekko speech scene",
-    "Peaky Blinders Tommy Shelby deal scene short",
-    "Succession boardroom power scene short clip",
-    "Moneyball negotiation scene short clip",
-    "Silicon Valley pitch scene short clip",
-    "The Social Network Facebook pitch scene",
-    "Jerry Maguire show me the money scene",
-    "Entourage Ari Gold negotiation scene short",
-    "Ozark Marty Byrde money scene short clip",
-    "Boiler Room sales pitch scene short",
-    "The Big Short explanation scene short",
-    "Margin Call boardroom scene short clip",
-    "Shark Tank best pitch deal scene short",
-]
+def get_random_clip(out_dir):
+    """List files in Google Drive folder and download a random one"""
+    try:
+        # List files in the folder using Google Drive API (no auth needed for shared folders)
+        list_url = f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}"
+        
+        # Use gdown to list and download
+        result = subprocess.run([
+            'python3', '-c',
+            f"""
+import gdown, json, random
+files = gdown.download_folder(id='{GDRIVE_FOLDER_ID}', quiet=True, use_cookies=False, remaining_ok=True)
+print(json.dumps(files))
+"""
+        ], capture_output=True, text=True, timeout=30)
+        
+    except:
+        pass
+    
+    # Use direct Google Drive download approach
+    # Get file list via Google Drive API public endpoint
+    api_url = f"https://www.googleapis.com/drive/v3/files?q='{GDRIVE_FOLDER_ID}'+in+parents&key=AIzaSyD-placeholder&fields=files(id,name,size)"
+    
+    # Fallback: hardcode some file IDs from the folder we can see
+    # We'll use gdown to download individual files
+    return None
+
+
+def download_gdrive_file(file_id, out_dir, filename):
+    """Download a single file from Google Drive"""
+    output_path = os.path.join(out_dir, filename)
+    try:
+        result = subprocess.run([
+            'gdown', f'https://drive.google.com/uc?id={file_id}',
+            '-O', output_path, '--quiet'
+        ], capture_output=True, timeout=120)
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+            return output_path
+    except Exception as e:
+        print(f"gdown error: {e}")
+    return None
 
 
 def get_thumbnail_frame(filepath, out_dir):
     frame_path = os.path.join(out_dir, 'frame.jpg')
     subprocess.run([
-        'ffmpeg', '-y', '-ss', '5', '-i', filepath,
+        'ffmpeg', '-y', '-ss', '3', '-i', filepath,
         '-vframes', '1', '-q:v', '2', frame_path
     ], capture_output=True, timeout=15)
     return frame_path if os.path.exists(frame_path) else None
 
 
-def generate_hook_for_clip(filepath, out_dir, query):
+def generate_hook_for_clip(filepath, out_dir, filename):
     try:
         frame_path = get_thumbnail_frame(filepath, out_dir)
-
         if frame_path and ANTHROPIC_KEY:
             with open(frame_path, 'rb') as f:
                 img_data = base64.b64encode(f.read()).decode()
 
             prompt = """You are creating a viral YouTube Short in the style of @biz.surgeon.
 
-I will show you a frame from a TV show or movie clip. Write a 2-line business/money/success hook that matches the scene.
+Look at this frame from a business/money/success video clip. Write a 2-line hook.
 
-Rules:
 - Line 1 = SETUP (ends with "...")
 - Line 2 = PUNCHLINE with business lesson (ends with emoji)
-- Capitalize Every Word
-- Max 8 words per line
+- Capitalize Every Word, max 8 words per line
 - Examples:
   "He Didn't Negotiate The Price..." / "He Negotiated The Power! 💼"
   "They Laughed At The Idea..." / "Until It Was Worth Billions! 💻"
   "While Everyone Panicked..." / "He Was Already Positioning! 📈"
-  "He Manipulated His Clients Into The Sale..." / "Without Even Realizing It! 😏"
   "Always Looks Easy Money..." / "Until The Work Actually Begins! 🌀"
 
-The clip is from: """ + query + """
+Clip filename: """ + filename + """
 
 Respond ONLY with valid JSON:
 {"hook": ["Line one setup...", "Line two punchline! 💰"]}"""
@@ -90,14 +106,7 @@ Respond ONLY with valid JSON:
                     "messages": [{
                         "role": "user",
                         "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/jpeg",
-                                    "data": img_data
-                                }
-                            },
+                            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": img_data}},
                             {"type": "text", "text": prompt}
                         ]
                     }]
@@ -113,7 +122,7 @@ Respond ONLY with valid JSON:
                     return result['hook']
 
     except Exception as e:
-        print(f"Hook generation error: {e}")
+        print(f"Hook error: {e}")
 
     fallbacks = [
         ["He Didn't Ask For The Deal...", "He Made Them Offer It! 💼"],
@@ -129,7 +138,6 @@ Respond ONLY with valid JSON:
 def create_line_image(text, width=1080, height=115):
     img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-
     try:
         font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 48)
     except:
@@ -149,7 +157,7 @@ def create_line_image(text, width=1080, height=115):
     y = 28
 
     for word in words:
-        clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊✍️🎓📞🔥🤝🫡😏')
+        clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊🔥🤝🫡😏')
         if clean in filler:
             color = 'white'
         else:
@@ -164,42 +172,29 @@ def create_line_image(text, width=1080, height=115):
 
 @app.route('/download', methods=['POST'])
 def download():
-    query = random.choice(SEARCH_QUERIES)
-    print(f"Searching: {query}")
-
-    search_term = f"ytsearch10:{query}"
     out_dir = tempfile.mkdtemp()
-    out_template = os.path.join(out_dir, '%(id)s.%(ext)s')
-
-    cmd = [
-        'yt-dlp',
-        '--format', 'bestvideo[height<=1080][ext=mp4]+bestaudio/best[height<=1080]',
-        '--merge-output-format', 'mp4',
-        '--no-playlist',
-        '--no-check-certificate',
-        '--extractor-retries', '3',
-        '--cookies', '/app/cookies.txt',
-        '--proxy', PROXY,
-        '--remote-components', 'ejs:github',
-        '--max-filesize', '100m',
-        '--match-filter', 'duration <= 180',
-        '--output', out_template,
-        '--print', 'after_move:filepath',
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        search_term
+    
+    # These are file IDs from the Cutted Clips folder
+    # We'll pick one randomly and download it
+    CLIP_FILES = [
+        {"id": "FILE_ID_1", "name": "50 milion.mp4"},
+        {"id": "FILE_ID_2", "name": "air jordan.mp4"},
+        {"id": "FILE_ID_3", "name": "conversation-copy.mp4"},
+        {"id": "FILE_ID_4", "name": "credit-copy.mp4"},
+        {"id": "FILE_ID_5", "name": "floor-copy.mp4"},
+        {"id": "FILE_ID_6", "name": "lambo-copy.mp4"},
     ]
-
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-    lines_out = [l.strip() for l in result.stdout.strip().split('\n') if l.strip().endswith('.mp4')]
-
-    if not lines_out:
-        return jsonify({'error': 'No clip found', 'stderr': result.stderr[-2000:]}), 400
-
-    filepath = lines_out[0]
-    print(f"Downloaded: {filepath}, size: {os.path.getsize(filepath)}")
+    
+    clip = random.choice(CLIP_FILES)
+    print(f"Downloading: {clip['name']}")
+    
+    filepath = download_gdrive_file(clip['id'], out_dir, clip['name'])
+    
+    if not filepath:
+        return jsonify({'error': 'Failed to download clip from Google Drive'}), 400
 
     try:
-        hook_lines = generate_hook_for_clip(filepath, out_dir, query)
+        hook_lines = generate_hook_for_clip(filepath, out_dir, clip['name'])
         print(f"Hook: {hook_lines}")
 
         line1_img = create_line_image(hook_lines[0])
@@ -241,14 +236,11 @@ def download():
         ]
 
         proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=180)
-        print(f"FFmpeg returncode: {proc.returncode}")
-        print(f"FFmpeg stderr: {proc.stderr[-1000:]}")
-        print(f"Output exists: {os.path.exists(output_path)}")
-        if os.path.exists(output_path):
-            print(f"Output size: {os.path.getsize(output_path)}")
+        print(f"FFmpeg code: {proc.returncode}")
+        if proc.returncode != 0:
+            print(f"FFmpeg error: {proc.stderr[-500:]}")
 
         final_path = output_path if os.path.exists(output_path) and os.path.getsize(output_path) > 10000 else filepath
-        print(f"Sending file: {final_path}, size: {os.path.getsize(final_path)}")
 
         with open(final_path, 'rb') as f:
             caption = '\n'.join(hook_lines)
