@@ -22,10 +22,9 @@ def download():
         '--extractor-retries', '5',
         '--cookies', '/app/cookies.txt',
         '--proxy', PROXY,
+        '--remote-components', 'ejs:github',
         '--output', out_template,
         '--print', 'after_move:filepath',
-        '--compat-options', 'no-youtube-unavailable-videos',
-        '--extractor-args', 'youtube:skip=dash,hls',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         search_term
     ]
@@ -67,5 +66,5 @@ def health():
     return jsonify({'status': 'ok'})
 
 if __name__ == '__main__':
-   port = int(os.environ.get('PORT', 8080))
-app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
