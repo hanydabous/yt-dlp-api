@@ -24,7 +24,7 @@ def download():
         '--cookies', '/app/cookies.txt',
         '--proxy', PROXY,
         '--remote-components', 'ejs:github',
-        '--max-filesize', '15m',
+        '--max-filesize', '50m',
         '--output', out_template,
         '--print', 'after_move:filepath',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -45,19 +45,41 @@ def download():
     filesize = os.path.getsize(filepath)
 
     try:
+        # Step 1: Get a signed upload URL from Shotstack
+        signed = requests.post(
+            'https://api.shotstack.io/ingest/stage/upload',
+            headers={
+                'x-api-key': SHOTSTACK_KEY,
+                'Content-Type': 'application/json'
+            },
+            json={'filename': filename},
+            timeout=30
+        )
+
+        if not signed.ok:
+            os.remove(filepath)
+            return jsonify({'error': 'Could not get upload URL', 'details': signed.text}), 500
+
+        signed_data = signed.json()
+        upload_url = signed_data.get('data', {}).get('attributes', {}).get('url', '')
+        source_url = signed_data.get('data', {}).get('attributes', {}).get('source', '')
+
+        if not upload_url:
+            os.remove(filepath)
+            return jsonify({'error': 'No upload URL returned', 'response': signed_data}), 500
+
+        # Step 2: Upload file directly to signed URL
         with open(filepath, 'rb') as f:
-            upload = requests.post(
-                'https://api.shotstack.io/ingest/stage/upload',
-                headers={'x-api-key': SHOTSTACK_KEY},
-                files={'file': (filename, f, 'video/mp4')},
-                timeout=120
+            put = requests.put(
+                upload_url,
+                data=f,
+                headers={'Content-Type': 'video/mp4'},
+                timeout=300
             )
 
         os.remove(filepath)
 
-        if upload.ok:
-            data = upload.json()
-            source_url = data.get('data', {}).get('attributes', {}).get('source', '')
+        if put.ok or put.status_code == 200:
             return jsonify({
                 'success': True,
                 'video_url': source_url,
@@ -65,7 +87,7 @@ def download():
                 'size': filesize
             })
         else:
-            return jsonify({'error': 'Upload failed', 'details': upload.text}), 500
+            return jsonify({'error': 'PUT upload failed', 'status': put.status_code}), 500
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
