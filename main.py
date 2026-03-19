@@ -61,6 +61,7 @@ def download():
         upload_data = upload_req.json()
         put_url = upload_data.get('data', {}).get('attributes', {}).get('url', '')
         source_url = upload_data.get('data', {}).get('attributes', {}).get('source', '')
+        source_id = upload_data.get('data', {}).get('id', '')
 
         if not put_url:
             os.remove(filepath)
@@ -87,6 +88,7 @@ def download():
         return jsonify({
             'success': True,
             'video_url': source_url,
+            'source_id': source_id,
             'filename': filename,
             'put_status': put.status_code
         })
