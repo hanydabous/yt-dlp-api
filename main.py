@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import subprocess, os, tempfile, requests, random
 from PIL import Image, ImageDraw, ImageFont
-import json
+import json, base64
 
 app = Flask(__name__)
 
@@ -16,81 +16,126 @@ MUSIC_TRACKS = [
     "https://cdn.pixabay.com/audio/2021/11/13/audio_cb4f5da9a6.mp3",
 ]
 
-FALLBACK_CLIPS = [
-    {"query": "Suits Harvey Specter you dont send a message scene", "hook": ["He Didn't Negotiate The Price...", "He Negotiated The Power! 💼"]},
-    {"query": "Mad Men Don Draper Carousel pitch scene", "hook": ["He Didn't Sell A Product...", "He Sold A Feeling! 🎯"]},
-    {"query": "Wolf of Wall Street sell me this pen scene", "hook": ["Create The Need First...", "Then Offer The Solution! 💰"]},
-    {"query": "Billions Bobby Axelrod I am the best scene", "hook": ["He Never Asked For Permission...", "He Asked For Forgiveness After! 📈"]},
-    {"query": "Breaking Bad Walter White I am the danger scene", "hook": ["The Moment He Stopped Being A Victim...", "He Became The Boss! ⚡"]},
-    {"query": "Glengarry Glen Ross coffee is for closers speech", "hook": ["He Came To Motivate Them...", "But Only The Strong Survived! ☕"]},
-    {"query": "Wall Street Gordon Gekko greed is good speech", "hook": ["He Turned Greed Into...", "A Business Philosophy! 💎"]},
-    {"query": "Peaky Blinders Tommy Shelby business deal scene", "hook": ["He Always Made An Offer...", "They Couldn't Refuse! 🎩"]},
-    {"query": "Succession Logan Roy boardroom scene", "hook": ["He Built An Empire...", "By Trusting No One! 👑"]},
-    {"query": "Moneyball we're gonna change the game scene", "hook": ["They Said It Was Impossible...", "Until He Made It The Standard! 🏆"]},
+SEARCH_QUERIES = [
+    "Suits Harvey Specter negotiation scene short clip",
+    "Mad Men Don Draper pitch scene short clip",
+    "Wolf of Wall Street Jordan Belfort sales scene",
+    "Billions Bobby Axelrod trading scene short",
+    "Breaking Bad Walter White business scene short",
+    "Glengarry Glen Ross sales speech scene",
+    "Wall Street Gordon Gekko speech scene",
+    "Peaky Blinders Tommy Shelby deal scene short",
+    "Succession boardroom power scene short clip",
+    "Moneyball negotiation scene short clip",
+    "Silicon Valley pitch scene short clip",
+    "The Social Network Facebook pitch scene",
+    "Jerry Maguire show me the money scene",
+    "Entourage Ari Gold negotiation scene short",
+    "Ozark Marty Byrde money scene short clip",
+    "Boiler Room sales pitch scene short",
+    "The Big Short explanation scene short",
+    "Margin Call boardroom scene short clip",
+    "Industry trading scene short clip",
+    "Shark Tank best pitch deal scene short",
 ]
 
 
-def generate_clip_idea():
+def get_thumbnail_frame(filepath, out_dir):
+    """Extract a frame from the middle of the video as JPEG for Claude to analyze"""
+    frame_path = os.path.join(out_dir, 'frame.jpg')
+    subprocess.run([
+        'ffmpeg', '-y', '-ss', '5', '-i', filepath,
+        '-vframes', '1', '-q:v', '2', frame_path
+    ], capture_output=True, timeout=15)
+    return frame_path if os.path.exists(frame_path) else None
+
+
+def generate_hook_for_clip(filepath, out_dir, query):
+    """Send a frame to Claude and ask it to write a matching business hook"""
     try:
-        prompt = """You are a viral YouTube Shorts creator in the style of @mdscae and @biz.surgeon.
+        frame_path = get_thumbnail_frame(filepath, out_dir)
+        
+        if frame_path and ANTHROPIC_KEY:
+            with open(frame_path, 'rb') as f:
+                img_data = base64.b64encode(f.read()).decode()
 
-Generate ONE fresh idea for a business/money/success lesson clip from a famous TV show or movie.
+            prompt = """You are creating a viral YouTube Short in the style of @biz.surgeon.
 
-The hook must have PROGRESSION and CLIMAX:
-- Line 1 = the SETUP/TENSION (ends with "..." to create suspense)
-- Line 2 = the CLIMAX/PUNCHLINE (the lesson that hits hard, ends with emoji)
+I'm going to show you a frame from a TV show or movie clip. Your job is to write a 2-line business/money/success hook that matches what happens in this scene.
 
-Examples of perfect hooks:
-- "He Didn't Negotiate The Price..." / "He Negotiated The Power! 💼"
-- "They Laughed At The Idea..." / "Until It Was Worth Billions! 💻"
-- "She Walked In With Nothing..." / "And Left A Millionaire! 🦈"
-- "He Lost Everything Twice..." / "And Still Built An Empire! 🔥"
-- "They Came To Fire Him..." / "He Left With The Deal! 🤝"
-- "While Everyone Panicked..." / "He Was Already Positioning! 📈"
+Rules:
+- Line 1 = the SETUP (what the viewer is about to see happen, ends with "...")
+- Line 2 = the PUNCHLINE/LESSON (the business truth the scene reveals, ends with relevant emoji)
+- Style examples:
+  "He Didn't Negotiate The Price..." / "He Negotiated The Power! 💼"
+  "They Laughed At The Idea..." / "Until It Was Worth Billions! 💻"
+  "She Walked In With Nothing..." / "And Left A Millionaire! 🦈"
+  "He Manipulated His Clients Into The Sale..." / "Without Even Realizing It! 😏"
+  "Always Looks Easy Money..." / "Until The Work Actually Begins! 🌀"
+  "She Showed Kindness In Business..." / "And It Always Paid Off! 🤝"
+  "The Moment You Realize The Monster..." / "Was Acting Innocent All Along! 🫡"
 
-Use specific iconic scenes from: Suits, Mad Men, Breaking Bad, Billions, Succession, 
-Peaky Blinders, Silicon Valley, The Social Network, Wolf of Wall Street, 
-Glengarry Glen Ross, Wall Street, Moneyball, Entourage, Ozark, Shark Tank,
-Jerry Maguire, The Godfather, American Psycho, Boiler Room, Margin Call,
-The Big Short, Two and a Half Men, Modern Family, Scrubs, House MD,
-Yellowstone, Ozark, Narcos, Boardwalk Empire, Billions, Industry
+- Capitalize Every Word
+- Keep it short and punchy — max 8 words per line
+- Make it feel like a life/business lesson, not a movie description
+- Match the energy of what you see in the frame
+
+The clip is from a search for: """ + query + """
 
 Respond ONLY with valid JSON:
-{
-  "query": "specific scene search query for YouTube",
-  "hook": ["Line one setup with ...at end", "Line two climax with emoji! 🔥"]
-}"""
+{"hook": ["Line one setup...", "Line two punchline! 💰"]}"""
 
-        response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 200,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=15
-        )
+            response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": ANTHROPIC_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": "claude-sonnet-4-20250514",
+                    "max_tokens": 150,
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/jpeg",
+                                    "data": img_data
+                                }
+                            },
+                            {"type": "text", "text": prompt}
+                        ]
+                    }]
+                },
+                timeout=15
+            )
 
-        if response.ok:
-            text = response.json()['content'][0]['text'].strip()
-            text = text.replace('```json', '').replace('```', '').strip()
-            idea = json.loads(text)
-            if 'query' in idea and 'hook' in idea:
-                return idea
+            if response.ok:
+                text = response.json()['content'][0]['text'].strip()
+                text = text.replace('```json', '').replace('```', '').strip()
+                result = json.loads(text)
+                if 'hook' in result and len(result['hook']) == 2:
+                    return result['hook']
 
     except Exception as e:
-        print(f"Claude API error: {e}")
+        print(f"Hook generation error: {e}")
 
-    return random.choice(FALLBACK_CLIPS)
+    # Fallback hooks if Claude fails
+    fallbacks = [
+        ["He Didn't Ask For The Deal...", "He Made Them Offer It! 💼"],
+        ["They Underestimated Him...", "Until It Was Too Late! ⚡"],
+        ["While Everyone Panicked...", "He Was Already Positioning! 📈"],
+        ["The Smartest Move In The Room...", "Was Playing Dumb! 🧠"],
+        ["He Lost It All Once...", "And Built It Back Bigger! 🔥"],
+        ["They Came To Shut Him Down...", "He Left With The Contract! 🤝"],
+    ]
+    return random.choice(fallbacks)
 
 
-def create_line_image(text, width=1080, height=110):
-    """Create a single line of colored text as PNG"""
+def create_line_image(text, width=1080, height=115):
     img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
@@ -103,22 +148,22 @@ def create_line_image(text, width=1080, height=110):
     filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
               'from','is','it','he','she','they','his','her','their','was','were',
               'be','been','as','on','up','had','has','not','no','its','into','until',
-              'still','while','after','before','first','then','him','her','them'}
+              'still','while','after','before','first','then','him','them','always',
+              'never','ever','just','all','was','it','its','this','that','too'}
 
     words = text.split()
     total_w = sum(draw.textlength(w + ' ', font=font) for w in words)
     x = max(10, (width - total_w) / 2)
     color_idx = 0
-    y = 25
+    y = 28
 
     for word in words:
-        clean = word.lower().rstrip('!?.,:...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊✍️🎓📞🔥')
+        clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊✍️🎓📞🔥🤝🫡')
         if clean in filler:
             color = 'white'
         else:
             color = word_colors[color_idx % len(word_colors)]
             color_idx += 1
-        # Shadow
         draw.text((x + 2, y + 2), word + ' ', font=font, fill=(0, 0, 0, 220))
         draw.text((x, y), word + ' ', font=font, fill=color)
         x += draw.textlength(word + ' ', font=font)
@@ -128,12 +173,8 @@ def create_line_image(text, width=1080, height=110):
 
 @app.route('/download', methods=['POST'])
 def download():
-    clip_data = generate_clip_idea()
-    query = clip_data['query']
-    hook_lines = clip_data['hook']
-
-    print(f"Query: {query}")
-    print(f"Hook: {hook_lines}")
+    query = random.choice(SEARCH_QUERIES)
+    print(f"Searching: {query}")
 
     search_term = f"ytsearch10:{query}"
     out_dir = tempfile.mkdtemp()
@@ -166,12 +207,16 @@ def download():
     filepath = lines_out[0]
 
     try:
-        # Line 1 = hook (shows immediately)
+        # Claude analyzes the clip and writes a matching hook
+        hook_lines = generate_hook_for_clip(filepath, out_dir, query)
+        print(f"Hook: {hook_lines}")
+
+        # Line 1 = shows from start
         line1_img = create_line_image(hook_lines[0])
         line1_path = os.path.join(out_dir, 'line1.png')
         line1_img.save(line1_path)
 
-        # Line 2 = climax (fades in at 40% through the video)
+        # Line 2 = fades in at halfway point
         line2_img = create_line_image(hook_lines[1])
         line2_path = os.path.join(out_dir, 'line2.png')
         line2_img.save(line2_path)
@@ -185,7 +230,20 @@ def download():
 
         output_path = os.path.join(out_dir, 'final.mp4')
 
-        # ffmpeg: crop to 9:16, line1 shows from 0s, line2 fades in at 40% duration
+        # Get video duration for timing line 2
+        probe = subprocess.run([
+            'ffprobe', '-v', 'quiet', '-print_format', 'json',
+            '-show_format', filepath
+        ], capture_output=True, text=True)
+        duration = 30
+        try:
+            probe_data = json.loads(probe.stdout)
+            duration = float(probe_data['format']['duration'])
+        except:
+            pass
+
+        line2_start = duration * 0.45  # Line 2 drops in at 45% through
+
         ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-i', filepath,
@@ -193,17 +251,13 @@ def download():
             '-i', line1_path,
             '-i', line2_path,
             '-filter_complex',
-            # Crop to vertical
-            '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v];'
-            # Line 1: visible from start
-            '[v][2:v]overlay=0:30:enable=\'gte(t,0)\'[v1];'
-            # Line 2: fades in at 40% of video with alpha fade
-            '[3:v]fade=in:st=0:d=0.8:alpha=1[line2fade];'
-            '[v1][line2fade]overlay=0:140:enable=\'gte(t,between(t,0,999)*0+lt(t,999))\':shortest=1[vt];'
-            # Audio: lower original, boost music
-            '[0:a]volume=0.12[va];'
-            '[1:a]volume=0.65[music];'
-            '[va][music]amix=inputs=2:duration=first[aout]',
+            f'[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v];'
+            f'[v][2:v]overlay=0:30[v1];'
+            f'[3:v]fade=in:st=0:d=1.0:alpha=1[line2f];'
+            f'[v1][line2f]overlay=0:148:enable=\'gte(t,{line2_start:.1f})\'[vt];'
+            f'[0:a]volume=0.1[va];'
+            f'[1:a]volume=0.7[music];'
+            f'[va][music]amix=inputs=2:duration=first[aout]',
             '-map', '[vt]',
             '-map', '[aout]',
             '-c:v', 'libx264',
@@ -214,9 +268,10 @@ def download():
         ]
 
         proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=180)
-        
-        # If complex filter failed, use simple fallback
+
+        # Fallback if ffmpeg failed
         if not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
+            print(f"FFmpeg error: {proc.stderr[-500:]}")
             ffmpeg_simple = [
                 'ffmpeg', '-y',
                 '-i', filepath,
@@ -226,9 +281,9 @@ def download():
                 '-filter_complex',
                 '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v];'
                 '[v][2:v]overlay=0:30[v1];'
-                '[v1][3:v]overlay=0:145[vt];'
-                '[0:a]volume=0.12[va];'
-                '[1:a]volume=0.65[music];'
+                '[v1][3:v]overlay=0:148[vt];'
+                '[0:a]volume=0.1[va];'
+                '[1:a]volume=0.7[music];'
                 '[va][music]amix=inputs=2:duration=first[aout]',
                 '-map', '[vt]',
                 '-map', '[aout]',
@@ -262,7 +317,7 @@ def download():
 
         if tg.ok:
             file_id = tg.json().get('result', {}).get('video', {}).get('file_id', '')
-            return jsonify({'success': True, 'file_id': file_id, 'hook': hook_lines, 'query': query})
+            return jsonify({'success': True, 'file_id': file_id, 'hook': hook_lines})
         else:
             return jsonify({'error': 'Telegram failed', 'details': tg.text}), 500
 
