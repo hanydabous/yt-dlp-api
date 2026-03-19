@@ -5,17 +5,6 @@ app = Flask(__name__)
 
 PROXY = "http://hrwmqwzu:aznd3fx6nczr@31.59.20.176:6754"
 
-def install_deno():
-    deno = '/root/.deno/bin/deno'
-    if not os.path.exists(deno):
-        os.system('curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/root/.deno sh 2>/dev/null')
-    if os.path.exists(deno):
-        os.environ['PATH'] = '/root/.deno/bin:' + os.environ.get('PATH', '')
-        os.environ['DENO_INSTALL'] = '/root/.deno'
-    return os.path.exists(deno)
-
-install_deno()
-
 @app.route('/download', methods=['POST'])
 def download():
     data = request.json
@@ -25,24 +14,23 @@ def download():
     out_dir = tempfile.mkdtemp()
     out_template = os.path.join(out_dir, '%(id)s.%(ext)s')
 
-    env = os.environ.copy()
-    env['PATH'] = '/root/.deno/bin:' + env.get('PATH', '')
-
     cmd = [
         'yt-dlp',
-        '--format', 'worst[ext=mp4]/worst',
+        '--format', 'worst[ext=mp4]/worst/best',
         '--no-playlist',
         '--no-check-certificate',
-        '--extractor-retries', '3',
+        '--extractor-retries', '5',
         '--cookies', '/app/cookies.txt',
         '--proxy', PROXY,
         '--output', out_template,
         '--print', 'after_move:filepath',
+        '--compat-options', 'no-youtube-unavailable-videos',
+        '--extractor-args', 'youtube:skip=dash,hls',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         search_term
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=240, env=env)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
     lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip().endswith('.mp4')]
 
     if not lines:
