@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-import subprocess, os, tempfile
+import subprocess, os, tempfile, requests
 
 app = Flask(__name__)
 
@@ -7,14 +7,12 @@ PROXY = "http://hrwmqwzu:aznd3fx6nczr@45.61.118.112:5809"
 BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
 CHAT_ID = "8388528228"
 
-import requests
-
 @app.route('/download', methods=['POST'])
 def download():
     data = request.json
     query = data.get('query', '')
 
-    search_term = f"ytsearch1:{query}"
+    search_term = f"ytsearch5:{query} short clip scene"
     out_dir = tempfile.mkdtemp()
     out_template = os.path.join(out_dir, '%(id)s.%(ext)s')
 
@@ -28,6 +26,7 @@ def download():
         '--proxy', PROXY,
         '--remote-components', 'ejs:github',
         '--max-filesize', '20m',
+        '--match-filter', 'duration <= 120',
         '--output', out_template,
         '--print', 'after_move:filepath',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
