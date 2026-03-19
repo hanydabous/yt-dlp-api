@@ -35,62 +35,53 @@ def download():
     lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip().endswith('.mp4')]
 
     if not lines:
-        return jsonify({
-            'error': 'No clip found',
-            'stderr': result.stderr[-2000:]
-        }), 400
+        return jsonify({'error': 'No clip found', 'stderr': result.stderr[-2000:]}), 400
 
     filepath = lines[0]
     filename = os.path.basename(filepath)
 
     try:
+        with open(filepath, 'rb') as f:
+            file_data = f.read()
+
+        public_url = ''
+        try:
+            tmp = requests.post(
+                'https://tmpfiles.org/api/v1/upload',
+                files={'file': (filename, file_data, 'video/mp4')},
+                timeout=60
+            )
+            if tmp.ok:
+                raw = tmp.json().get('data', {}).get('url', '')
+                public_url = raw.replace('tmpfiles.org/', 'tmpfiles.org/dl/')
+        except:
+            pass
+
         upload_req = requests.post(
             'https://api.shotstack.io/ingest/stage/upload',
-            headers={
-                'x-api-key': SHOTSTACK_KEY,
-                'Content-Type': 'application/json'
-            },
+            headers={'x-api-key': SHOTSTACK_KEY, 'Content-Type': 'application/json'},
             json={'filename': filename},
             timeout=30
         )
 
-        if not upload_req.ok:
-            os.remove(filepath)
-            return jsonify({'error': 'Upload init failed', 'details': upload_req.text}), 500
-
-        upload_data = upload_req.json()
-        put_url = upload_data.get('data', {}).get('attributes', {}).get('url', '')
-        source_url = upload_data.get('data', {}).get('attributes', {}).get('source', '')
-        source_id = upload_data.get('data', {}).get('id', '')
-
-        if not put_url:
-            os.remove(filepath)
-            return jsonify({'error': 'No URL in response', 'response': upload_data}), 500
-
-        with open(filepath, 'rb') as f:
-            file_data = f.read()
+        shotstack_url = ''
+        source_id = ''
+        if upload_req.ok:
+            upload_data = upload_req.json()
+            put_url = upload_data.get('data', {}).get('attributes', {}).get('url', '')
+            source_id = upload_data.get('data', {}).get('id', '')
+            if put_url:
+                requests.put(put_url, data=file_data, timeout=300)
+                shotstack_url = f"shotstack:{source_id}"
 
         os.remove(filepath)
 
-        put = requests.put(
-            put_url,
-            data=file_data,
-            timeout=300
-        )
-
-        if put.status_code not in [200, 201, 204]:
-            return jsonify({
-                'error': 'PUT upload failed',
-                'status': put.status_code,
-                'response': put.text[:500]
-            }), 500
-
         return jsonify({
             'success': True,
-            'video_url': source_url,
+            'public_url': public_url,
+            'shotstack_url': shotstack_url,
             'source_id': source_id,
-            'filename': filename,
-            'put_status': put.status_code
+            'filename': filename
         })
 
     except Exception as e:
