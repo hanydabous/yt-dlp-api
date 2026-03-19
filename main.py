@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
-import subprocess, os, tempfile, requests
+import subprocess, os, tempfile, requests, boto3
+from botocore.exceptions import ClientError
 
 app = Flask(__name__)
 
@@ -42,54 +43,49 @@ def download():
 
     filepath = lines[0]
     filename = os.path.basename(filepath)
-    filesize = os.path.getsize(filepath)
 
     try:
-        # Step 1: Get a signed upload URL from Shotstack
-        signed = requests.post(
-            'https://api.shotstack.io/ingest/stage/upload',
-            headers={
-                'x-api-key': SHOTSTACK_KEY,
-                'Content-Type': 'application/json'
-            },
-            json={'filename': filename},
-            timeout=30
-        )
+        # Upload to Shotstack using multipart - correct endpoint
+        with open(filepath, 'rb') as f:
+            upload = requests.post(
+                'https://api.shotstack.io/ingest/stage/sources',
+                headers={'x-api-key': SHOTSTACK_KEY},
+                json={'url': 'upload'},
+                timeout=30
+            )
 
-        if not signed.ok:
+        if not upload.ok:
             os.remove(filepath)
-            return jsonify({'error': 'Could not get upload URL', 'details': signed.text}), 500
+            return jsonify({'error': 'Source create failed', 'details': upload.text}), 500
 
-        signed_data = signed.json()
-        upload_url = signed_data.get('data', {}).get('attributes', {}).get('url', '')
-        source_url = signed_data.get('data', {}).get('attributes', {}).get('source', '')
+        upload_data = upload.json()
+        put_url = upload_data.get('data', {}).get('attributes', {}).get('upload', '')
+        source_url = upload_data.get('data', {}).get('attributes', {}).get('source', '')
 
-        if not upload_url:
+        if not put_url:
             os.remove(filepath)
-            return jsonify({'error': 'No upload URL returned', 'response': signed_data}), 500
+            return jsonify({'error': 'No put URL', 'response': upload_data}), 500
 
-        # Step 2: Upload file directly to signed URL
         with open(filepath, 'rb') as f:
             put = requests.put(
-                upload_url,
-                data=f,
+                put_url,
+                data=f.read(),
                 headers={'Content-Type': 'video/mp4'},
                 timeout=300
             )
 
         os.remove(filepath)
 
-        if put.ok or put.status_code == 200:
-            return jsonify({
-                'success': True,
-                'video_url': source_url,
-                'filename': filename,
-                'size': filesize
-            })
-        else:
-            return jsonify({'error': 'PUT upload failed', 'status': put.status_code}), 500
+        return jsonify({
+            'success': True,
+            'video_url': source_url,
+            'filename': filename,
+            'put_status': put.status_code
+        })
 
     except Exception as e:
+        if os.path.exists(filepath):
+            os.remove(filepath)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/health', methods=['GET'])
@@ -99,3 +95,11 @@ def health():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
+```
+
+Also update `requirements.txt`:
+```
+flask
+yt-dlp
+requests
+boto3
