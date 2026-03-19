@@ -44,6 +44,7 @@ def download():
     filename = os.path.basename(filepath)
 
     try:
+        # Get signed URL immediately after download
         upload_req = requests.post(
             'https://api.shotstack.io/ingest/stage/upload',
             headers={
@@ -59,40 +60,41 @@ def download():
             return jsonify({'error': 'Upload init failed', 'details': upload_req.text}), 500
 
         upload_data = upload_req.json()
-        attributes = upload_data.get('data', {}).get('attributes', {})
-        source_id = upload_data.get('data', {}).get('id', '')
-        put_url = attributes.get('url', '')
+        put_url = upload_data.get('data', {}).get('attributes', {}).get('url', '')
+        source_url = upload_data.get('data', {}).get('attributes', {}).get('source', '')
 
         if not put_url:
             os.remove(filepath)
             return jsonify({'error': 'No URL in response', 'response': upload_data}), 500
 
-        # Read file into memory first
+        # Upload immediately - read entire file into memory first for speed
         with open(filepath, 'rb') as f:
             file_data = f.read()
 
         os.remove(filepath)
 
-        # PUT to signed S3 URL
         put = requests.put(
             put_url,
             data=file_data,
             headers={
                 'Content-Type': 'video/mp4',
-                'x-amz-acl': 'public-read'
+                'Content-Length': str(len(file_data))
             },
             timeout=300
         )
 
-        # Construct the source URL from the ID
-        source_url = f"https://shotstack-ingest-api-stage-sources.s3.ap-southeast-2.amazonaws.com/7up963gh1c/{source_id}/source"
+        if put.status_code not in [200, 201, 204]:
+            return jsonify({
+                'error': 'PUT upload failed',
+                'status': put.status_code,
+                'response': put.text[:500]
+            }), 500
 
         return jsonify({
             'success': True,
             'video_url': source_url,
             'filename': filename,
-            'put_status': put.status_code,
-            'source_id': source_id
+            'put_status': put.status_code
         })
 
     except Exception as e:
