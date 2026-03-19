@@ -1,19 +1,20 @@
 from flask import Flask, request, jsonify
-import subprocess, os, tempfile, requests, threading, uuid
+import subprocess, os, tempfile, requests
 
 app = Flask(__name__)
-jobs = {}
 
-def run_download(job_id, query):
-    jobs[job_id] = {'status': 'running'}
-    
+@app.route('/download', methods=['POST'])
+def download():
+    data = request.json
+    query = data.get('query', '')
+
     search_term = f"ytsearch1:{query}"
     out_dir = tempfile.mkdtemp()
     out_template = os.path.join(out_dir, '%(id)s.%(ext)s')
 
     cmd = [
         'yt-dlp',
-        '--format', 'best[height<=480][ext=mp4]/best[height<=480]/worst',
+        '--format', 'worst[ext=mp4]/worst',
         '--no-playlist',
         '--no-check-certificate',
         '--extractor-retries', '3',
@@ -24,16 +25,14 @@ def run_download(job_id, query):
         search_term
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
     lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip().endswith('.mp4')]
 
     if not lines:
-        jobs[job_id] = {
-            'status': 'error',
+        return jsonify({
             'error': 'No clip found',
             'stderr': result.stderr[-2000:]
-        }
-        return
+        }), 400
 
     filepath = lines[0]
 
@@ -47,31 +46,16 @@ def run_download(job_id, query):
         os.remove(filepath)
 
         if upload.ok:
-            jobs[job_id] = {
-                'status': 'done',
+            return jsonify({
+                'success': True,
                 'video_url': upload.json().get('link'),
                 'filename': os.path.basename(filepath)
-            }
+            })
         else:
-            jobs[job_id] = {'status': 'error', 'error': 'Upload failed'}
+            return jsonify({'error': 'Upload failed'}), 500
+
     except Exception as e:
-        jobs[job_id] = {'status': 'error', 'error': str(e)}
-
-@app.route('/download', methods=['POST'])
-def download():
-    data = request.json
-    query = data.get('query', '')
-    job_id = str(uuid.uuid4())
-    thread = threading.Thread(target=run_download, args=(job_id, query))
-    thread.start()
-    return jsonify({'job_id': job_id, 'status': 'started'})
-
-@app.route('/status/<job_id>', methods=['GET'])
-def status(job_id):
-    job = jobs.get(job_id)
-    if not job:
-        return jsonify({'status': 'not_found'}), 404
-    return jsonify(job)
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
