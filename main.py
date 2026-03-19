@@ -39,24 +39,29 @@ def download():
         }), 400
 
     filepath = lines[0]
+    filename = os.path.basename(filepath)
 
     try:
         with open(filepath, 'rb') as f:
             upload = requests.post(
-                'https://file.io/?expires=1d',
-                files={'file': (os.path.basename(filepath), f, 'video/mp4')},
-                timeout=60
+                'https://tmpfiles.org/api/v1/upload',
+                files={'file': (filename, f, 'video/mp4')},
+                timeout=120
             )
+
         os.remove(filepath)
 
         if upload.ok:
+            data = upload.json()
+            url = data.get('data', {}).get('url', '')
+            direct_url = url.replace('tmpfiles.org/', 'tmpfiles.org/dl/')
             return jsonify({
                 'success': True,
-                'video_url': upload.json().get('link'),
-                'filename': os.path.basename(filepath)
+                'video_url': direct_url,
+                'filename': filename
             })
         else:
-            return jsonify({'error': 'Upload failed'}), 500
+            return jsonify({'error': 'Upload failed', 'details': upload.text}), 500
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
