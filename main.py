@@ -1,12 +1,14 @@
 from flask import Flask, request, jsonify
 import subprocess, os, tempfile, requests, random
 from PIL import Image, ImageDraw, ImageFont
+import json
 
 app = Flask(__name__)
 
 PROXY = "http://hrwmqwzu:aznd3fx6nczr@45.61.118.112:5809"
 BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
 CHAT_ID = "8388528228"
+ANTHROPIC_KEY = "YOUR_ANTHROPIC_API_KEY"
 
 MUSIC_TRACKS = [
     "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
@@ -14,108 +16,76 @@ MUSIC_TRACKS = [
     "https://cdn.pixabay.com/audio/2021/11/13/audio_cb4f5da9a6.mp3",
 ]
 
-CLIPS = [
-    {
-        "query": "Suits Harvey Specter you dont send a message scene clip",
-        "hook": ["He Didn't Negotiate The Price", "He Negotiated The Power! 💼"]
-    },
-    {
-        "query": "Suits Harvey closer best I can do scene",
-        "hook": ["The Best Lawyers Don't Win In Court", "They Win Before It Starts! ⚖️"]
-    },
-    {
-        "query": "Suits Mike Ross genius memory scene",
-        "hook": ["He Used His Mind As", "His Only Weapon! 🧠"]
-    },
-    {
-        "query": "Mad Men Don Draper Carousel pitch scene",
-        "hook": ["He Didn't Sell A Product", "He Sold A Feeling! 🎯"]
-    },
-    {
-        "query": "Mad Men Don Draper this is not the future pitch",
-        "hook": ["They Came To Fire Him", "He Left With The Deal! 🤝"]
-    },
-    {
-        "query": "Wolf of Wall Street sell me this pen scene",
-        "hook": ["Create The Need First", "Then Offer The Solution! 💰"]
-    },
-    {
-        "query": "Wolf of Wall Street Jordan Belfort motivational speech",
-        "hook": ["He Lost Everything Twice", "And Still Built An Empire! 🔥"]
-    },
-    {
-        "query": "Billions Bobby Axelrod I am the best scene",
-        "hook": ["He Never Asked For Permission", "He Asked For Forgiveness After! 📈"]
-    },
-    {
-        "query": "Billions Chuck Rhoades courtroom speech",
-        "hook": ["The Room Went Silent", "The Moment He Walked In! 🏛️"]
-    },
-    {
-        "query": "Silicon Valley Richard Hendricks compression algorithm pitch",
-        "hook": ["They Laughed At The Idea", "Until It Was Worth Billions! 💻"]
-    },
-    {
-        "query": "Succession Logan Roy business meeting scene",
-        "hook": ["He Built An Empire", "By Trusting No One! 👑"]
-    },
-    {
-        "query": "Breaking Bad Walter White I am the danger scene",
-        "hook": ["The Moment He Stopped Being", "A Victim And Became The Boss! ⚡"]
-    },
-    {
-        "query": "Breaking Bad Walter I am the one who knocks",
-        "hook": ["He Didn't Ask For Respect", "He Demanded It! 😤"]
-    },
-    {
-        "query": "Moneyball Peter Brand statistics scene",
-        "hook": ["Everyone Saw Players", "He Saw Market Inefficiencies! 📊"]
-    },
-    {
-        "query": "Moneyball Billy Beane we're gonna change the game",
-        "hook": ["They Said It Was Impossible", "Until He Made It The Standard! 🏆"]
-    },
-    {
-        "query": "The Social Network Eduardo Saverin diluted shares scene",
-        "hook": ["He Signed The Paper Without Reading", "And Lost It All! ✍️"]
-    },
-    {
-        "query": "The Social Network Mark Zuckerberg deposition scene",
-        "hook": ["The Smartest Person In The Room", "Never Has To Say It! 🎓"]
-    },
-    {
-        "query": "Glengarry Glen Ross Alec Baldwin coffee is for closers",
-        "hook": ["He Came To Motivate Them", "But Only The Strong Survived! ☕"]
-    },
-    {
-        "query": "Wall Street Gordon Gekko greed is good speech",
-        "hook": ["He Turned Greed Into", "A Business Philosophy! 💎"]
-    },
-    {
-        "query": "Wall Street Gordon Gekko lunch is for wimps",
-        "hook": ["While They Rested", "He Was Already Winning! ⏱️"]
-    },
-    {
-        "query": "Entourage Ari Gold phone call negotiation scene",
-        "hook": ["He Closed The Deal", "Before They Hung Up! 📞"]
-    },
-    {
-        "query": "Shark Tank best pitch ever investor deal",
-        "hook": ["She Walked In Nervous", "And Left A Partner! 🦈"]
-    },
-    {
-        "query": "Jerry Maguire show me the money scene",
-        "hook": ["He Had One Client Left", "And Made Him A Legend! 💵"]
-    },
-    {
-        "query": "Ozark Marty Byrde money laundering explanation scene",
-        "hook": ["He Turned A Problem", "Into A Business Model! 🌀"]
-    },
-    {
-        "query": "Peaky Blinders Tommy Shelby business deal scene",
-        "hook": ["He Always Made An Offer", "They Couldn't Refuse! 🎩"]
-    },
+FALLBACK_CLIPS = [
+    {"query": "Suits Harvey Specter you dont send a message scene", "hook": ["He Didn't Negotiate The Price", "He Negotiated The Power! 💼"]},
+    {"query": "Mad Men Don Draper Carousel pitch scene", "hook": ["He Didn't Sell A Product", "He Sold A Feeling! 🎯"]},
+    {"query": "Wolf of Wall Street sell me this pen scene", "hook": ["Create The Need First", "Then Offer The Solution! 💰"]},
+    {"query": "Billions Bobby Axelrod I am the best scene", "hook": ["He Never Asked For Permission", "He Asked For Forgiveness After! 📈"]},
+    {"query": "Breaking Bad Walter White I am the danger scene", "hook": ["The Moment He Stopped Being", "A Victim And Became The Boss! ⚡"]},
+    {"query": "Glengarry Glen Ross coffee is for closers speech", "hook": ["He Came To Motivate Them", "But Only The Strong Survived! ☕"]},
+    {"query": "Wall Street Gordon Gekko greed is good speech", "hook": ["He Turned Greed Into", "A Business Philosophy! 💎"]},
+    {"query": "Moneyball we're gonna change the game scene", "hook": ["They Said It Was Impossible", "Until He Made It The Standard! 🏆"]},
+    {"query": "Peaky Blinders Tommy Shelby business deal scene", "hook": ["He Always Made An Offer", "They Couldn't Refuse! 🎩"]},
+    {"query": "Succession Logan Roy boardroom scene", "hook": ["He Built An Empire", "By Trusting No One! 👑"]},
 ]
+
+def generate_clip_idea():
+    """Use Claude AI to generate a fresh business lesson clip idea"""
+    try:
+        prompt = """You are a viral YouTube Shorts creator. Generate ONE fresh idea for a business/money lesson clip.
+
+The format must be:
+- A specific famous TV show or movie SCENE to search for on YouTube (from shows like Suits, Mad Men, Breaking Bad, Billions, Succession, Peaky Blinders, Silicon Valley, The Social Network, Wolf of Wall Street, Glengarry Glen Ross, Wall Street, Moneyball, Entourage, Ozark, Shark Tank, Jerry Maguire, etc.)
+- A 2-line business lesson hook text that connects the scene to a money/business/success lesson
+
+The hook text style must match these examples exactly:
+- "He Didn't Negotiate The Price / He Negotiated The Power! 💼"
+- "They Laughed At The Idea / Until It Was Worth Billions! 💻"  
+- "She Walked In With Nothing / And Left A Millionaire! 🦈"
+- "He Turned Greed Into / A Business Philosophy! 💎"
+
+Rules:
+- Hook line 1: setup (what happened)
+- Hook line 2: punchline/lesson with emoji
+- Scene must be a SPECIFIC iconic moment, not generic
+- Business/money/success/sales/negotiation angle always
+- Never repeat obvious scenes — be creative and varied
+
+Respond ONLY with valid JSON, no other text:
+{
+  "query": "specific scene search query for YouTube",
+  "hook": ["Line one of hook", "Line two with emoji! 🔥"]
+}"""
+
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            },
+            json={
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 200,
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=15
+        )
+
+        if response.ok:
+            text = response.json()['content'][0]['text'].strip()
+            # Strip markdown code fences if present
+            text = text.replace('```json', '').replace('```', '').strip()
+            idea = json.loads(text)
+            if 'query' in idea and 'hook' in idea:
+                return idea
+
+    except Exception as e:
+        print(f"Claude API error: {e}")
+
+    # Fallback to hardcoded list
+    return random.choice(FALLBACK_CLIPS)
+
 
 def create_text_overlay(text_lines, width=1080, height=220):
     img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
@@ -138,7 +108,7 @@ def create_text_overlay(text_lines, width=1080, height=220):
         x = max(0, (width - total_w) / 2)
         color_idx = 0
         for word in words:
-            clean = word.lower().rstrip('!?.,:🎯💼⚖️🧠💰🔥📈🏛️💻👑⚡😤📊🏆✍️🎓☕💎⏱️📞🦈💵🌀🎩')
+            clean = word.lower().rstrip('!?.,:💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊✍️🎓📞🔥')
             if clean in filler:
                 color = 'white'
             else:
@@ -151,11 +121,16 @@ def create_text_overlay(text_lines, width=1080, height=220):
 
     return img
 
+
 @app.route('/download', methods=['POST'])
 def download():
-    clip_data = random.choice(CLIPS)
+    # Generate fresh idea using Claude AI
+    clip_data = generate_clip_idea()
     query = clip_data['query']
     hook_lines = clip_data['hook']
+
+    print(f"Query: {query}")
+    print(f"Hook: {hook_lines}")
 
     search_term = f"ytsearch10:{query}"
     out_dir = tempfile.mkdtemp()
@@ -242,16 +217,18 @@ def download():
 
         if tg.ok:
             file_id = tg.json().get('result', {}).get('video', {}).get('file_id', '')
-            return jsonify({'success': True, 'file_id': file_id, 'hook': hook_lines})
+            return jsonify({'success': True, 'file_id': file_id, 'hook': hook_lines, 'query': query})
         else:
             return jsonify({'error': 'Telegram failed', 'details': tg.text}), 500
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok'})
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
