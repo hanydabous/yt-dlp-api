@@ -44,25 +44,30 @@ def download():
     filename = os.path.basename(filepath)
 
     try:
-        upload = requests.post(
-            'https://api.shotstack.io/ingest/stage/sources',
-            headers={'x-api-key': SHOTSTACK_KEY},
-            json={'url': 'upload'},
+        # Step 1: Create upload source and get signed URL
+        upload_req = requests.post(
+            'https://api.shotstack.io/ingest/stage/upload',
+            headers={
+                'x-api-key': SHOTSTACK_KEY,
+                'Content-Type': 'application/json'
+            },
+            json={'filename': filename, 'contentType': 'video/mp4'},
             timeout=30
         )
 
-        if not upload.ok:
+        if not upload_req.ok:
             os.remove(filepath)
-            return jsonify({'error': 'Source create failed', 'details': upload.text}), 500
+            return jsonify({'error': 'Upload init failed', 'details': upload_req.text}), 500
 
-        upload_data = upload.json()
-        put_url = upload_data.get('data', {}).get('attributes', {}).get('upload', '')
+        upload_data = upload_req.json()
+        put_url = upload_data.get('data', {}).get('attributes', {}).get('url', '')
         source_url = upload_data.get('data', {}).get('attributes', {}).get('source', '')
 
         if not put_url:
             os.remove(filepath)
-            return jsonify({'error': 'No put URL', 'response': upload_data}), 500
+            return jsonify({'error': 'No URL in response', 'response': upload_data}), 500
 
+        # Step 2: PUT file to signed URL
         with open(filepath, 'rb') as f:
             put = requests.put(
                 put_url,
