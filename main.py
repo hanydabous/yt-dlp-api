@@ -12,7 +12,7 @@ def download():
     data = request.json
     query = data.get('query', '')
 
-    search_term = f"ytsearch5:{query} short clip scene"
+    search_term = f"ytsearch10:{query}"
     out_dir = tempfile.mkdtemp()
     out_template = os.path.join(out_dir, '%(id)s.%(ext)s')
 
@@ -25,8 +25,8 @@ def download():
         '--cookies', '/app/cookies.txt',
         '--proxy', PROXY,
         '--remote-components', 'ejs:github',
-        '--max-filesize', '20m',
-        '--match-filter', 'duration <= 120',
+        '--max-filesize', '50m',
+        '--match-filter', 'duration <= 180',
         '--output', out_template,
         '--print', 'after_move:filepath',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -48,7 +48,7 @@ def download():
                 f'https://api.telegram.org/bot{BOT_TOKEN}/sendVideo',
                 data={
                     'chat_id': CHAT_ID,
-                    'caption': f'New clip ready!\n\nPress POST or SKIP',
+                    'caption': 'New clip ready!\n\nPress POST or SKIP',
                     'reply_markup': '{"inline_keyboard":[[{"text":"✅ POST","callback_data":"post"},{"text":"❌ SKIP","callback_data":"skip"}]]}'
                 },
                 files={'video': (filename, f, 'video/mp4')},
