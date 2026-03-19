@@ -17,20 +17,21 @@ def download():
 
     cmd = [
         'yt-dlp',
-        '--format', 'worstvideo[ext=mp4][filesize<8M]/worstvideo[filesize<8M]/worst[filesize<8M]/worst',
+        '--format', 'worst',
         '--no-playlist',
         '--no-check-certificate',
-        '--extractor-retries', '5',
+        '--extractor-retries', '3',
         '--cookies', '/app/cookies.txt',
         '--proxy', PROXY,
         '--remote-components', 'ejs:github',
+        '--max-filesize', '15m',
         '--output', out_template,
         '--print', 'after_move:filepath',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         search_term
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=480)
     lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip().endswith('.mp4')]
 
     if not lines:
@@ -41,6 +42,7 @@ def download():
 
     filepath = lines[0]
     filename = os.path.basename(filepath)
+    filesize = os.path.getsize(filepath)
 
     try:
         with open(filepath, 'rb') as f:
@@ -59,7 +61,8 @@ def download():
             return jsonify({
                 'success': True,
                 'video_url': source_url,
-                'filename': filename
+                'filename': filename,
+                'size': filesize
             })
         else:
             return jsonify({'error': 'Upload failed', 'details': upload.text}), 500
