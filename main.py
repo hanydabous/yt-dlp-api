@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
-import subprocess, os, tempfile, requests, boto3
-from botocore.exceptions import ClientError
+import subprocess, os, tempfile, requests
 
 app = Flask(__name__)
 
@@ -45,14 +44,12 @@ def download():
     filename = os.path.basename(filepath)
 
     try:
-        # Upload to Shotstack using multipart - correct endpoint
-        with open(filepath, 'rb') as f:
-            upload = requests.post(
-                'https://api.shotstack.io/ingest/stage/sources',
-                headers={'x-api-key': SHOTSTACK_KEY},
-                json={'url': 'upload'},
-                timeout=30
-            )
+        upload = requests.post(
+            'https://api.shotstack.io/ingest/stage/sources',
+            headers={'x-api-key': SHOTSTACK_KEY},
+            json={'url': 'upload'},
+            timeout=30
+        )
 
         if not upload.ok:
             os.remove(filepath)
