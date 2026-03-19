@@ -74,9 +74,7 @@ def download_gdrive_file(file_id, out_dir):
             'gdown', f'https://drive.google.com/uc?id={file_id}&confirm=t',
             '-O', output_path, '--quiet'
         ], capture_output=True, timeout=180)
-        print(f"gdown code: {result.returncode}")
         if os.path.exists(output_path) and os.path.getsize(output_path) > 10000:
-            print(f"Downloaded: {os.path.getsize(output_path)} bytes")
             return output_path
     except Exception as e:
         print(f"gdown error: {e}")
@@ -113,6 +111,7 @@ Look at this frame from a business/money/success video clip. Write a 2-line hook
   "Always Looks Easy Money..." / "Until The Work Actually Begins! 🌀"
   "She Showed Kindness In Business..." / "And It Always Paid Off! 🤝"
   "He Manipulated His Clients Into The Sale..." / "Without Even Realizing It! 😏"
+  "They Found Money Inside Cans..." / "And Turned A Dream Into Reality! 😤"
 
 Respond ONLY with valid JSON:
 {"hook": ["Line one setup...", "Line two punchline! 💰"]}"""
@@ -155,20 +154,27 @@ Respond ONLY with valid JSON:
         ["The Smartest Move In The Room...", "Was Playing Dumb! 🧠"],
         ["He Lost It All Once...", "And Built It Back Bigger! 🔥"],
         ["They Came To Shut Him Down...", "He Left With The Contract! 🤝"],
-        ["She Walked In With Nothing...", "And Left A Partner! 🦈"],
-        ["He Never Asked For Permission...", "He Asked For Forgiveness After! 👑"],
     ]
     return random.choice(fallbacks)
 
 
-def create_line_image(text, width=1080, height=115):
+def create_overlay_image(hook_lines, width=720, height=200):
+    """Create overlay with @MillionDollarScenes handle + colored hook text like biz.surgeon"""
     img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 48)
-    except:
-        font = ImageFont.load_default()
 
+    try:
+        font_handle = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 28)
+        font_hook = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 40)
+    except:
+        font_handle = ImageFont.load_default()
+        font_hook = font_handle
+
+    # Draw @MillionDollarScenes handle at top left
+    handle = "@milliondollarscenes"
+    draw.text((20, 10), handle, font=font_handle, fill=(200, 200, 200, 220))
+
+    # Draw colored hook lines below handle
     word_colors = ['#FF4444', '#FFD700', '#44DDFF', '#FF8C00', '#44FF88']
     filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
               'from','is','it','he','she','they','his','her','their','was','were',
@@ -176,22 +182,26 @@ def create_line_image(text, width=1080, height=115):
               'still','while','after','before','first','then','him','them','always',
               'never','ever','just','all','this','that','too'}
 
-    words = text.split()
-    total_w = sum(draw.textlength(w + ' ', font=font) for w in words)
-    x = max(10, (width - total_w) / 2)
-    color_idx = 0
-    y = 28
+    y_pos = 55
+    for line in hook_lines:
+        words = line.split()
+        total_w = sum(draw.textlength(w + ' ', font=font_hook) for w in words)
+        x = max(10, (width - total_w) / 2)
+        color_idx = 0
 
-    for word in words:
-        clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊🔥🤝🫡😏')
-        if clean in filler:
-            color = 'white'
-        else:
-            color = word_colors[color_idx % len(word_colors)]
-            color_idx += 1
-        draw.text((x + 2, y + 2), word + ' ', font=font, fill=(0, 0, 0, 220))
-        draw.text((x, y), word + ' ', font=font, fill=color)
-        x += draw.textlength(word + ' ', font=font)
+        for word in words:
+            clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊🔥🤝🫡😏')
+            if clean in filler:
+                color = 'white'
+            else:
+                color = word_colors[color_idx % len(word_colors)]
+                color_idx += 1
+            # Shadow
+            draw.text((x + 2, y_pos + 2), word + ' ', font=font_hook, fill=(0, 0, 0, 220))
+            draw.text((x, y_pos), word + ' ', font=font_hook, fill=color)
+            x += draw.textlength(word + ' ', font=font_hook)
+
+        y_pos += 58
 
     return img
 
@@ -210,13 +220,10 @@ def download():
         hook_lines = generate_hook(filepath, out_dir, file_id)
         print(f"Hook: {hook_lines}")
 
-        line1_img = create_line_image(hook_lines[0])
-        line1_path = os.path.join(out_dir, 'line1.png')
-        line1_img.save(line1_path)
-
-        line2_img = create_line_image(hook_lines[1])
-        line2_path = os.path.join(out_dir, 'line2.png')
-        line2_img.save(line2_path)
+        # Create overlay with handle + hook text
+        overlay_img = create_overlay_image(hook_lines)
+        overlay_path = os.path.join(out_dir, 'overlay.png')
+        overlay_img.save(overlay_path)
 
         music_url = random.choice(MUSIC_TRACKS)
         music_path = os.path.join(out_dir, 'music.mp3')
@@ -230,14 +237,12 @@ def download():
             'ffmpeg', '-y',
             '-i', filepath,
             '-i', music_path,
-            '-i', line1_path,
-            '-i', line2_path,
+            '-i', overlay_path,
             '-filter_complex',
             '[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280[v];'
-            '[v][2:v]overlay=0:20[v1];'
-            '[v1][3:v]overlay=0:100[vt];'
-            '[0:a]volume=0.1[va];'
-            '[1:a]volume=0.7[music];'
+            '[v][2:v]overlay=0:0[vt];'
+            '[0:a]volume=0.85[va];'
+            '[1:a]volume=0.15[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
             '-map', '[vt]',
             '-map', '[aout]',
@@ -253,12 +258,11 @@ def download():
         proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=180)
         print(f"FFmpeg: {proc.returncode}")
         if proc.returncode != 0:
-            print(f"FFmpeg error: {proc.stderr[-300:]}")
+            print(f"FFmpeg stderr: {proc.stderr[-300:]}")
 
         final_path = output_path if os.path.exists(output_path) and os.path.getsize(output_path) > 10000 else filepath
         print(f"Final size: {os.path.getsize(final_path)}")
 
-        # Send to Telegram
         with open(final_path, 'rb') as f:
             caption = '\n'.join(hook_lines)
             tg = requests.post(
@@ -277,11 +281,9 @@ def download():
 
         tg_data = tg.json()
         telegram_file_id = tg_data.get('result', {}).get('video', {}).get('file_id', '')
-
-        # Store video path for YouTube upload
         VIDEO_STORE[telegram_file_id] = final_path
 
-        for p in [filepath, music_path, line1_path, line2_path]:
+        for p in [filepath, music_path, overlay_path]:
             if os.path.exists(p):
                 try: os.remove(p)
                 except: pass
