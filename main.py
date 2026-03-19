@@ -35,13 +35,11 @@ SEARCH_QUERIES = [
     "Boiler Room sales pitch scene short",
     "The Big Short explanation scene short",
     "Margin Call boardroom scene short clip",
-    "Industry trading scene short clip",
     "Shark Tank best pitch deal scene short",
 ]
 
 
 def get_thumbnail_frame(filepath, out_dir):
-    """Extract a frame from the middle of the video as JPEG for Claude to analyze"""
     frame_path = os.path.join(out_dir, 'frame.jpg')
     subprocess.run([
         'ffmpeg', '-y', '-ss', '5', '-i', filepath,
@@ -51,36 +49,30 @@ def get_thumbnail_frame(filepath, out_dir):
 
 
 def generate_hook_for_clip(filepath, out_dir, query):
-    """Send a frame to Claude and ask it to write a matching business hook"""
     try:
         frame_path = get_thumbnail_frame(filepath, out_dir)
-        
+
         if frame_path and ANTHROPIC_KEY:
             with open(frame_path, 'rb') as f:
                 img_data = base64.b64encode(f.read()).decode()
 
             prompt = """You are creating a viral YouTube Short in the style of @biz.surgeon.
 
-I'm going to show you a frame from a TV show or movie clip. Your job is to write a 2-line business/money/success hook that matches what happens in this scene.
+I will show you a frame from a TV show or movie clip. Write a 2-line business/money/success hook that matches the scene.
 
 Rules:
-- Line 1 = the SETUP (what the viewer is about to see happen, ends with "...")
-- Line 2 = the PUNCHLINE/LESSON (the business truth the scene reveals, ends with relevant emoji)
-- Style examples:
+- Line 1 = SETUP (ends with "...")
+- Line 2 = PUNCHLINE with business lesson (ends with emoji)
+- Capitalize Every Word
+- Max 8 words per line
+- Examples:
   "He Didn't Negotiate The Price..." / "He Negotiated The Power! 💼"
   "They Laughed At The Idea..." / "Until It Was Worth Billions! 💻"
-  "She Walked In With Nothing..." / "And Left A Millionaire! 🦈"
+  "While Everyone Panicked..." / "He Was Already Positioning! 📈"
   "He Manipulated His Clients Into The Sale..." / "Without Even Realizing It! 😏"
   "Always Looks Easy Money..." / "Until The Work Actually Begins! 🌀"
-  "She Showed Kindness In Business..." / "And It Always Paid Off! 🤝"
-  "The Moment You Realize The Monster..." / "Was Acting Innocent All Along! 🫡"
 
-- Capitalize Every Word
-- Keep it short and punchy — max 8 words per line
-- Make it feel like a life/business lesson, not a movie description
-- Match the energy of what you see in the frame
-
-The clip is from a search for: """ + query + """
+The clip is from: """ + query + """
 
 Respond ONLY with valid JSON:
 {"hook": ["Line one setup...", "Line two punchline! 💰"]}"""
@@ -123,7 +115,6 @@ Respond ONLY with valid JSON:
     except Exception as e:
         print(f"Hook generation error: {e}")
 
-    # Fallback hooks if Claude fails
     fallbacks = [
         ["He Didn't Ask For The Deal...", "He Made Them Offer It! 💼"],
         ["They Underestimated Him...", "Until It Was Too Late! ⚡"],
@@ -149,7 +140,7 @@ def create_line_image(text, width=1080, height=115):
               'from','is','it','he','she','they','his','her','their','was','were',
               'be','been','as','on','up','had','has','not','no','its','into','until',
               'still','while','after','before','first','then','him','them','always',
-              'never','ever','just','all','was','it','its','this','that','too'}
+              'never','ever','just','all','this','that','too'}
 
     words = text.split()
     total_w = sum(draw.textlength(w + ' ', font=font) for w in words)
@@ -158,7 +149,7 @@ def create_line_image(text, width=1080, height=115):
     y = 28
 
     for word in words:
-        clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊✍️🎓📞🔥🤝🫡')
+        clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊✍️🎓📞🔥🤝🫡😏')
         if clean in filler:
             color = 'white'
         else:
@@ -205,23 +196,20 @@ def download():
         return jsonify({'error': 'No clip found', 'stderr': result.stderr[-2000:]}), 400
 
     filepath = lines_out[0]
+    print(f"Downloaded: {filepath}, size: {os.path.getsize(filepath)}")
 
     try:
-        # Claude analyzes the clip and writes a matching hook
         hook_lines = generate_hook_for_clip(filepath, out_dir, query)
         print(f"Hook: {hook_lines}")
 
-        # Line 1 = shows from start
         line1_img = create_line_image(hook_lines[0])
         line1_path = os.path.join(out_dir, 'line1.png')
         line1_img.save(line1_path)
 
-        # Line 2 = fades in at halfway point
         line2_img = create_line_image(hook_lines[1])
         line2_path = os.path.join(out_dir, 'line2.png')
         line2_img.save(line2_path)
 
-        # Download music
         music_url = random.choice(MUSIC_TRACKS)
         music_path = os.path.join(out_dir, 'music.mp3')
         r = requests.get(music_url, timeout=30)
@@ -230,20 +218,6 @@ def download():
 
         output_path = os.path.join(out_dir, 'final.mp4')
 
-        # Get video duration for timing line 2
-        probe = subprocess.run([
-            'ffprobe', '-v', 'quiet', '-print_format', 'json',
-            '-show_format', filepath
-        ], capture_output=True, text=True)
-        duration = 30
-        try:
-            probe_data = json.loads(probe.stdout)
-            duration = float(probe_data['format']['duration'])
-        except:
-            pass
-
-        line2_start = duration * 0.45  # Line 2 drops in at 45% through
-
         ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-i', filepath,
@@ -251,51 +225,30 @@ def download():
             '-i', line1_path,
             '-i', line2_path,
             '-filter_complex',
-            f'[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v];'
-            f'[v][2:v]overlay=0:30[v1];'
-            f'[3:v]fade=in:st=0:d=1.0:alpha=1[line2f];'
-            f'[v1][line2f]overlay=0:148:enable=\'gte(t,{line2_start:.1f})\'[vt];'
-            f'[0:a]volume=0.1[va];'
-            f'[1:a]volume=0.7[music];'
-            f'[va][music]amix=inputs=2:duration=first[aout]',
+            '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v];'
+            '[v][2:v]overlay=0:30[v1];'
+            '[v1][3:v]overlay=0:148[vt];'
+            '[0:a]volume=0.1[va];'
+            '[1:a]volume=0.7[music];'
+            '[va][music]amix=inputs=2:duration=first[aout]',
             '-map', '[vt]',
             '-map', '[aout]',
             '-c:v', 'libx264',
             '-c:a', 'aac',
             '-shortest',
-            '-preset', 'fast',
+            '-preset', 'ultrafast',
             output_path
         ]
 
         proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=180)
+        print(f"FFmpeg returncode: {proc.returncode}")
+        print(f"FFmpeg stderr: {proc.stderr[-1000:]}")
+        print(f"Output exists: {os.path.exists(output_path)}")
+        if os.path.exists(output_path):
+            print(f"Output size: {os.path.getsize(output_path)}")
 
-        # Fallback if ffmpeg failed
-        if not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
-            print(f"FFmpeg error: {proc.stderr[-500:]}")
-            ffmpeg_simple = [
-                'ffmpeg', '-y',
-                '-i', filepath,
-                '-i', music_path,
-                '-i', line1_path,
-                '-i', line2_path,
-                '-filter_complex',
-                '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v];'
-                '[v][2:v]overlay=0:30[v1];'
-                '[v1][3:v]overlay=0:148[vt];'
-                '[0:a]volume=0.1[va];'
-                '[1:a]volume=0.7[music];'
-                '[va][music]amix=inputs=2:duration=first[aout]',
-                '-map', '[vt]',
-                '-map', '[aout]',
-                '-c:v', 'libx264',
-                '-c:a', 'aac',
-                '-shortest',
-                '-preset', 'fast',
-                output_path
-            ]
-            subprocess.run(ffmpeg_simple, capture_output=True, timeout=180)
-
-        final_path = output_path if os.path.exists(output_path) else filepath
+        final_path = output_path if os.path.exists(output_path) and os.path.getsize(output_path) > 10000 else filepath
+        print(f"Sending file: {final_path}, size: {os.path.getsize(final_path)}")
 
         with open(final_path, 'rb') as f:
             caption = '\n'.join(hook_lines)
@@ -322,6 +275,7 @@ def download():
             return jsonify({'error': 'Telegram failed', 'details': tg.text}), 500
 
     except Exception as e:
+        print(f"Exception: {e}")
         return jsonify({'error': str(e)}), 500
 
 
