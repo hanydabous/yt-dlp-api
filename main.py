@@ -59,29 +59,40 @@ def download():
             return jsonify({'error': 'Upload init failed', 'details': upload_req.text}), 500
 
         upload_data = upload_req.json()
-        put_url = upload_data.get('data', {}).get('attributes', {}).get('url', '')
-        source_url = upload_data.get('data', {}).get('attributes', {}).get('source', '')
+        attributes = upload_data.get('data', {}).get('attributes', {})
+        source_id = upload_data.get('data', {}).get('id', '')
+        put_url = attributes.get('url', '')
 
         if not put_url:
             os.remove(filepath)
             return jsonify({'error': 'No URL in response', 'response': upload_data}), 500
 
+        # Read file into memory first
         with open(filepath, 'rb') as f:
-            put = requests.put(
-                put_url,
-                data=f.read(),
-                headers={'Content-Type': 'video/mp4'},
-                timeout=300
-            )
+            file_data = f.read()
 
         os.remove(filepath)
+
+        # PUT to signed S3 URL
+        put = requests.put(
+            put_url,
+            data=file_data,
+            headers={
+                'Content-Type': 'video/mp4',
+                'x-amz-acl': 'public-read'
+            },
+            timeout=300
+        )
+
+        # Construct the source URL from the ID
+        source_url = f"https://shotstack-ingest-api-stage-sources.s3.ap-southeast-2.amazonaws.com/7up963gh1c/{source_id}/source"
 
         return jsonify({
             'success': True,
             'video_url': source_url,
             'filename': filename,
             'put_status': put.status_code,
-            'full_upload_response': upload_data
+            'source_id': source_id
         })
 
     except Exception as e:
