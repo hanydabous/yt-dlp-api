@@ -3,21 +3,7 @@ import subprocess, os, tempfile, requests
 
 app = Flask(__name__)
 
-def setup_deno():
-    if not os.path.exists('/root/.deno/bin/deno'):
-        subprocess.run(
-            'curl -fsSL https://deno.land/install.sh | sh',
-            shell=True, capture_output=True
-        )
-    deno_path = '/root/.deno/bin/deno'
-    if os.path.exists(deno_path):
-        current_path = os.environ.get('PATH', '')
-        if '/root/.deno/bin' not in current_path:
-            os.environ['PATH'] = f'/root/.deno/bin:{current_path}'
-        return True
-    return False
-
-setup_deno()
+PROXY = "http://hrwmqwzu:aznd3fx6nczr@31.59.20.176:6754"
 
 @app.route('/download', methods=['POST'])
 def download():
@@ -35,6 +21,7 @@ def download():
         '--no-check-certificate',
         '--extractor-retries', '3',
         '--cookies', '/app/cookies.txt',
+        '--proxy', PROXY,
         '--output', out_template,
         '--print', 'after_move:filepath',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
