@@ -8,7 +8,6 @@ app = Flask(__name__)
 BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
 CHAT_ID = "8388528228"
 ANTHROPIC_KEY = os.environ.get("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", "")
-GDRIVE_FOLDER_ID = "1q3pmO2X31IE8lyzA6LuGIMHIwVAQvY5j"
 
 MUSIC_TRACKS = [
     "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
@@ -16,43 +15,67 @@ MUSIC_TRACKS = [
     "https://cdn.pixabay.com/audio/2021/11/13/audio_cb4f5da9a6.mp3",
 ]
 
-def get_random_clip(out_dir):
-    """List files in Google Drive folder and download a random one"""
-    try:
-        # List files in the folder using Google Drive API (no auth needed for shared folders)
-        list_url = f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}"
-        
-        # Use gdown to list and download
-        result = subprocess.run([
-            'python3', '-c',
-            f"""
-import gdown, json, random
-files = gdown.download_folder(id='{GDRIVE_FOLDER_ID}', quiet=True, use_cookies=False, remaining_ok=True)
-print(json.dumps(files))
-"""
-        ], capture_output=True, text=True, timeout=30)
-        
-    except:
-        pass
-    
-    # Use direct Google Drive download approach
-    # Get file list via Google Drive API public endpoint
-    api_url = f"https://www.googleapis.com/drive/v3/files?q='{GDRIVE_FOLDER_ID}'+in+parents&key=AIzaSyD-placeholder&fields=files(id,name,size)"
-    
-    # Fallback: hardcode some file IDs from the folder we can see
-    # We'll use gdown to download individual files
-    return None
+CLIP_IDS = [
+    "1ipjyBMTGlam6PgvLtv2Atl8vmnfbG0UK",
+    "1Hm9qjf9QBJ05yxe414qTFW_zFxsknadZ",
+    "1rjBuyZWF0rT9aCr0Hql1XANwEs-RYzw1",
+    "1oSiFUHlQypg-xyZ73lhLbYN89AWdmxEz",
+    "1G_YW2d8H5Vd6-AVQti0Vgimrw7Fd0eVx",
+    "1Wcryu1ylTZpUOTIA03N2TsfUUM84nHK7",
+    "1JwC941HVUTHxMKe3ExBSHgjnNaozTMhk",
+    "1C6aWqclsau8keBj1IDHrjAF_ruOQtwhA",
+    "1sYGg0zzq50bod2_8y63PuQrtNZk8sDNp",
+    "1GwpbLByFsxxbkwcO5A78V5p00pyKklhE",
+    "1tN1xoO6C8A0M061qWd_c4TTIyZ3g00uN",
+    "1RVZcq1vhWjyHK_MWTAXZ7jXvH6rqyOMc",
+    "1BwmwTYP-mDouSd3uM24J79s7rj34IuVw",
+    "1bq23T4b-N1irx3fMVw66uJ7z-NE98HHf",
+    "1SkWFT3wKNJdW6iSwNMU_R8_IwSAGNEQ4",
+    "1VnvB5WdZ6HrSfPi_yfV2V1GYwhZitrOO",
+    "1MuDISJYL_r5haDnJ5EQEAmY1Non-s9s9",
+    "1A_QcMChcu_SdaqGSJkjQ2W45hb26PL6r",
+    "16Gvl5Y7-NrHVIpvtga1GSDE22mEA9GmA",
+    "1BxGNfZ2CaG7emB7DGIxC2UrwCsdbYHf9",
+    "1-Y_3mpQWSl4cgm_vFQaYswAmI1Rj2QeJ",
+    "1eprPIzwGlnjTLs-Hb4kmQqWDJh_R8N4t",
+    "15YcWnnAXnDc5Zqca_5dLSjA8XXfXhv__",
+    "1lraugxY3Gt_F2F_Y18dUAM7FzfkU0QLx",
+    "1F5AaW7PISkHEF78b3GdHn3UEM5C1b5TP",
+    "19ie3YQPpL0vI_nsDPdK3uzkFP_EC3IfZ",
+    "1CZg9qXSn6lhBu5LfVYpHfUdZaJJnmt6M",
+    "1BRHJRtxYxSN4svW_J7zMTFT3EvEtFaye",
+    "1yWoLs_P1GdY0Km5TfDVOBY6Ymrs6FXWC",
+    "1gfipusj5doO-si6EdkK2fpddKCVQtdM1",
+    "15pDSFExEl_UtRwf8jpA77T6-9o7T2Fxb",
+    "1QrbTS1BduTX_WWtNKCco5qUIKcjyIQgn",
+    "1kYsTEfUOsYHCcn64o0yZxLjnTr5-zkd2",
+    "1-gRpq_aJmBUnFWAF1d0OG7AI-IHgny2T",
+    "1lr2BeulKVUJn8lVMAWLHnKbkowMZpzCu",
+    "1GrItgtaqThwE0jKt1mI9se29-KMAL2Pz",
+    "1YPC13xMk3K_w1jWYyj3CMBdT_IjAaWaq",
+    "19crntgfV33p_nVbexcw_txyYbdYl9i1L",
+    "1Mf7CBE7mkgmlCCq1dvgTTrvD7ChApQjV",
+    "1fOYZCnUZ0ZKwWxWSTNv2VpovqSDY6LL0",
+    "1l1QSAyy1pByQSo6v-uuVrDEM7AG3UIRG",
+    "1kAE6qSesJYFxZnCnmQ04V4UChoUY5XaS",
+    "1zJLAmbiLrTKR7gbvtTqpDjxtKWgv7fw5",
+    "1-dQya0U-TCTjNs3J8-1Fp2MbB1R1EVFI",
+    "1Zs8mQg0YGWdrExdUDTBwW2ur2RTolgWC",
+    "1OAVaLU1C0chXTbJEcwomqipH4qJwIyJ9",
+]
 
 
-def download_gdrive_file(file_id, out_dir, filename):
-    """Download a single file from Google Drive"""
-    output_path = os.path.join(out_dir, filename)
+def download_gdrive_file(file_id, out_dir):
+    output_path = os.path.join(out_dir, f'{file_id}.mp4')
     try:
         result = subprocess.run([
-            'gdown', f'https://drive.google.com/uc?id={file_id}',
+            'gdown', f'https://drive.google.com/uc?id={file_id}&confirm=t',
             '-O', output_path, '--quiet'
-        ], capture_output=True, timeout=120)
-        if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+        ], capture_output=True, timeout=180)
+        print(f"gdown returncode: {result.returncode}")
+        print(f"gdown stderr: {result.stderr[-300:]}")
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 10000:
+            print(f"Downloaded: {os.path.getsize(output_path)} bytes")
             return output_path
     except Exception as e:
         print(f"gdown error: {e}")
@@ -68,7 +91,7 @@ def get_thumbnail_frame(filepath, out_dir):
     return frame_path if os.path.exists(frame_path) else None
 
 
-def generate_hook_for_clip(filepath, out_dir, filename):
+def generate_hook(filepath, out_dir, file_id):
     try:
         frame_path = get_thumbnail_frame(filepath, out_dir)
         if frame_path and ANTHROPIC_KEY:
@@ -87,8 +110,7 @@ Look at this frame from a business/money/success video clip. Write a 2-line hook
   "They Laughed At The Idea..." / "Until It Was Worth Billions! 💻"
   "While Everyone Panicked..." / "He Was Already Positioning! 📈"
   "Always Looks Easy Money..." / "Until The Work Actually Begins! 🌀"
-
-Clip filename: """ + filename + """
+  "She Showed Kindness In Business..." / "And It Always Paid Off! 🤝"
 
 Respond ONLY with valid JSON:
 {"hook": ["Line one setup...", "Line two punchline! 💰"]}"""
@@ -131,6 +153,8 @@ Respond ONLY with valid JSON:
         ["The Smartest Move In The Room...", "Was Playing Dumb! 🧠"],
         ["He Lost It All Once...", "And Built It Back Bigger! 🔥"],
         ["They Came To Shut Him Down...", "He Left With The Contract! 🤝"],
+        ["She Walked In With Nothing...", "And Left A Partner! 🦈"],
+        ["He Never Asked For Permission...", "He Asked For Forgiveness After! 👑"],
     ]
     return random.choice(fallbacks)
 
@@ -173,28 +197,15 @@ def create_line_image(text, width=1080, height=115):
 @app.route('/download', methods=['POST'])
 def download():
     out_dir = tempfile.mkdtemp()
-    
-    # These are file IDs from the Cutted Clips folder
-    # We'll pick one randomly and download it
-    CLIP_FILES = [
-        {"id": "FILE_ID_1", "name": "50 milion.mp4"},
-        {"id": "FILE_ID_2", "name": "air jordan.mp4"},
-        {"id": "FILE_ID_3", "name": "conversation-copy.mp4"},
-        {"id": "FILE_ID_4", "name": "credit-copy.mp4"},
-        {"id": "FILE_ID_5", "name": "floor-copy.mp4"},
-        {"id": "FILE_ID_6", "name": "lambo-copy.mp4"},
-    ]
-    
-    clip = random.choice(CLIP_FILES)
-    print(f"Downloading: {clip['name']}")
-    
-    filepath = download_gdrive_file(clip['id'], out_dir, clip['name'])
-    
+    file_id = random.choice(CLIP_IDS)
+    print(f"Downloading file ID: {file_id}")
+
+    filepath = download_gdrive_file(file_id, out_dir)
     if not filepath:
-        return jsonify({'error': 'Failed to download clip from Google Drive'}), 400
+        return jsonify({'error': 'Failed to download from Google Drive'}), 400
 
     try:
-        hook_lines = generate_hook_for_clip(filepath, out_dir, clip['name'])
+        hook_lines = generate_hook(filepath, out_dir, file_id)
         print(f"Hook: {hook_lines}")
 
         line1_img = create_line_image(hook_lines[0])
@@ -241,6 +252,7 @@ def download():
             print(f"FFmpeg error: {proc.stderr[-500:]}")
 
         final_path = output_path if os.path.exists(output_path) and os.path.getsize(output_path) > 10000 else filepath
+        print(f"Sending: {final_path}, size: {os.path.getsize(final_path)}")
 
         with open(final_path, 'rb') as f:
             caption = '\n'.join(hook_lines)
