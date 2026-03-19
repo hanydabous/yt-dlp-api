@@ -1,5 +1,6 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import subprocess, os, tempfile, requests
+import io
 
 app = Flask(__name__)
 
@@ -45,19 +46,31 @@ def download():
 
         os.remove(filepath)
 
-        tmp = requests.post(
-            'https://catbox.moe/user/api.php',
-            data={'reqtype': 'fileupload'},
-            files={'fileToUpload': (filename, file_data, 'video/mp4')},
+        # Upload to file.io - expires after 1 download
+        upload = requests.post(
+            'https://file.io',
+            files={'file': (filename, file_data, 'video/mp4')},
+            data={'expires': '1d'},
             timeout=120
         )
 
-        if not tmp.ok or not tmp.text.strip().startswith('https'):
-            return jsonify({'error': 'Upload failed', 'details': tmp.text}), 500
+        if upload.ok:
+            url = upload.json().get('link', '')
+            if url:
+                return jsonify({
+                    'success': True,
+                    'public_url': url,
+                    'filename': filename
+                })
+
+        # Fallback: store locally and serve
+        store_path = f'/tmp/{filename}'
+        with open(store_path, 'wb') as f:
+            f.write(file_data)
 
         return jsonify({
             'success': True,
-            'public_url': tmp.text.strip(),
+            'public_url': f'stored:{store_path}',
             'filename': filename
         })
 
@@ -65,6 +78,13 @@ def download():
         if os.path.exists(filepath):
             os.remove(filepath)
         return jsonify({'error': str(e)}), 500
+
+@app.route('/serve/<filename>', methods=['GET'])
+def serve(filename):
+    path = f'/tmp/{filename}'
+    if os.path.exists(path):
+        return send_file(path, mimetype='video/mp4')
+    return 'Not found', 404
 
 @app.route('/health', methods=['GET'])
 def health():
