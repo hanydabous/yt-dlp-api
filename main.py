@@ -44,14 +44,13 @@ def download():
     filename = os.path.basename(filepath)
 
     try:
-        # Step 1: Create upload source and get signed URL
         upload_req = requests.post(
             'https://api.shotstack.io/ingest/stage/upload',
             headers={
                 'x-api-key': SHOTSTACK_KEY,
                 'Content-Type': 'application/json'
             },
-            json={'filename': filename, 'contentType': 'video/mp4'},
+            json={'filename': filename},
             timeout=30
         )
 
@@ -67,7 +66,6 @@ def download():
             os.remove(filepath)
             return jsonify({'error': 'No URL in response', 'response': upload_data}), 500
 
-        # Step 2: PUT file to signed URL
         with open(filepath, 'rb') as f:
             put = requests.put(
                 put_url,
