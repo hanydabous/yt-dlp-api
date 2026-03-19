@@ -80,7 +80,8 @@ def download():
             'success': True,
             'video_url': source_url,
             'filename': filename,
-            'put_status': put.status_code
+            'put_status': put.status_code,
+            'full_upload_response': upload_data
         })
 
     except Exception as e:
