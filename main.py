@@ -44,7 +44,7 @@ def download():
     try:
         with open(filepath, 'rb') as f:
             upload = requests.post(
-                'https://tmpfiles.org/api/v1/upload',
+                'https://store1.gofile.io/uploadFile',
                 files={'file': (filename, f, 'video/mp4')},
                 timeout=120
             )
@@ -53,8 +53,9 @@ def download():
 
         if upload.ok:
             data = upload.json()
-            url = data.get('data', {}).get('url', '')
-            direct_url = url.replace('tmpfiles.org/', 'tmpfiles.org/dl/')
+            direct_url = data.get('data', {}).get('directLink', '')
+            if not direct_url:
+                direct_url = 'https://gofile.io/d/' + data.get('data', {}).get('code', '')
             return jsonify({
                 'success': True,
                 'video_url': direct_url,
