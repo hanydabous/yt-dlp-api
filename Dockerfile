@@ -12,8 +12,3 @@ COPY . .
 
 EXPOSE 8080
 CMD ["python", "main.py"]
-Also update main.py — change the last line from:
-pythonapp.run(host='0.0.0.0', port=port)
-Change the port line to:
-pythonport = int(os.environ.get('PORT', 8080))
-app.run(host='0.0.0.0', port=port)
