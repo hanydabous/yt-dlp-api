@@ -4,6 +4,7 @@ import subprocess, os, tempfile, requests
 app = Flask(__name__)
 
 PROXY = "http://hrwmqwzu:aznd3fx6nczr@31.59.20.176:6754"
+SHOTSTACK_KEY = "Ymna74p8i5tavuS2aO7LPEAPGjBAZBf1KhHiK0TC"
 
 @app.route('/download', methods=['POST'])
 def download():
@@ -44,7 +45,8 @@ def download():
     try:
         with open(filepath, 'rb') as f:
             upload = requests.post(
-                'https://store1.gofile.io/uploadFile',
+                'https://api.shotstack.io/ingest/stage/upload',
+                headers={'x-api-key': SHOTSTACK_KEY},
                 files={'file': (filename, f, 'video/mp4')},
                 timeout=120
             )
@@ -53,12 +55,10 @@ def download():
 
         if upload.ok:
             data = upload.json()
-            direct_url = data.get('data', {}).get('directLink', '')
-            if not direct_url:
-                direct_url = 'https://gofile.io/d/' + data.get('data', {}).get('code', '')
+            source_url = data.get('data', {}).get('attributes', {}).get('source', '')
             return jsonify({
                 'success': True,
-                'video_url': direct_url,
+                'video_url': source_url,
                 'filename': filename
             })
         else:
