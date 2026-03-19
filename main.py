@@ -74,3 +74,265 @@ def download_gdrive_file(file_id, out_dir):
             'gdown', f'https://drive.google.com/uc?id={file_id}&confirm=t',
             '-O', output_path, '--quiet'
         ], capture_output=True, timeout=180)
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 10000:
+            return output_path
+    except Exception as e:
+        print(f"gdown error: {e}")
+    return None
+
+
+def get_thumbnail_frame(filepath, out_dir):
+    frame_path = os.path.join(out_dir, 'frame.jpg')
+    subprocess.run([
+        'ffmpeg', '-y', '-ss', '3', '-i', filepath,
+        '-vframes', '1', '-q:v', '2', frame_path
+    ], capture_output=True, timeout=15)
+    return frame_path if os.path.exists(frame_path) else None
+
+
+def generate_hook(filepath, out_dir, file_id):
+    try:
+        frame_path = get_thumbnail_frame(filepath, out_dir)
+        if frame_path and ANTHROPIC_KEY:
+            with open(frame_path, 'rb') as f:
+                img_data = base64.b64encode(f.read()).decode()
+
+            prompt = """You are creating a viral YouTube Short in the style of @biz.surgeon.
+
+Look at this frame from a business/money/success video clip. Write a 2-line hook.
+
+- Line 1 = SETUP (ends with "...")
+- Line 2 = PUNCHLINE with business lesson (ends with emoji)
+- Capitalize Every Word, max 8 words per line
+- Examples:
+  "He Didn't Negotiate The Price..." / "He Negotiated The Power! 💼"
+  "They Laughed At The Idea..." / "Until It Was Worth Billions! 💻"
+  "While Everyone Panicked..." / "He Was Already Positioning! 📈"
+  "Always Looks Easy Money..." / "Until The Work Actually Begins! 🌀"
+  "She Showed Kindness In Business..." / "And It Always Paid Off! 🤝"
+  "He Manipulated His Clients Into The Sale..." / "Without Even Realizing It! 😏"
+  "They Found Money Inside Cans..." / "And Turned A Dream Into Reality! 😤"
+
+Respond ONLY with valid JSON:
+{"hook": ["Line one setup...", "Line two punchline! 💰"]}"""
+
+            response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": ANTHROPIC_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": "claude-sonnet-4-20250514",
+                    "max_tokens": 150,
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": img_data}},
+                            {"type": "text", "text": prompt}
+                        ]
+                    }]
+                },
+                timeout=15
+            )
+
+            if response.ok:
+                text = response.json()['content'][0]['text'].strip()
+                text = text.replace('```json', '').replace('```', '').strip()
+                result = json.loads(text)
+                if 'hook' in result and len(result['hook']) == 2:
+                    return result['hook']
+
+    except Exception as e:
+        print(f"Hook error: {e}")
+
+    fallbacks = [
+        ["He Didn't Ask For The Deal...", "He Made Them Offer It! 💼"],
+        ["They Underestimated Him...", "Until It Was Too Late! ⚡"],
+        ["While Everyone Panicked...", "He Was Already Positioning! 📈"],
+        ["The Smartest Move In The Room...", "Was Playing Dumb! 🧠"],
+        ["He Lost It All Once...", "And Built It Back Bigger! 🔥"],
+        ["They Came To Shut Him Down...", "He Left With The Contract! 🤝"],
+        ["She Walked In With Nothing...", "And Left A Partner! 🦈"],
+        ["He Never Asked For Permission...", "He Asked For Forgiveness After! 👑"],
+    ]
+    return random.choice(fallbacks)
+
+
+def create_overlay_image(hook_lines, width=720, height=240):
+    img = Image.new('RGBA', (width, height), (0, 0, 0, 255))
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_name = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 32)
+        font_handle = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 26)
+        font_hook = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 36)
+    except:
+        font_name = ImageFont.load_default()
+        font_handle = font_name
+        font_hook = font_name
+
+    logo_size = 80
+    logo_x, logo_y = 15, 15
+    try:
+        logo = Image.open('/app/logo.png').convert('RGBA')
+        logo = logo.resize((logo_size, logo_size))
+        mask = Image.new('L', (logo_size, logo_size), 0)
+        from PIL import ImageDraw as ID
+        mask_draw = ID.Draw(mask)
+        mask_draw.ellipse((0, 0, logo_size, logo_size), fill=255)
+        logo.putalpha(mask)
+        border_draw = ImageDraw.Draw(img)
+        border_draw.ellipse(
+            (logo_x - 3, logo_y - 3, logo_x + logo_size + 3, logo_y + logo_size + 3),
+            outline='#E1306C', width=3
+        )
+        img.paste(logo, (logo_x, logo_y), logo)
+    except Exception as e:
+        print(f"Logo error: {e}")
+        draw.ellipse((logo_x, logo_y, logo_x + logo_size, logo_y + logo_size), fill='#FFD700')
+
+    name_x = logo_x + logo_size + 15
+    draw.text((name_x, logo_y + 8), "MillionDollarScenes™", font=font_name, fill='white')
+    check_w = draw.textlength("MillionDollarScenes™", font=font_name)
+    draw.text((name_x + check_w + 8, logo_y + 8), "✓", font=font_name, fill='#1DA1F2')
+    draw.text((name_x, logo_y + 46), "@MillionDollarScenes", font=font_handle, fill=(180, 180, 180, 255))
+
+    word_colors = ['#FF4444', '#FFD700', '#44DDFF', '#FF8C00', '#44FF88']
+    filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
+              'from','is','it','he','she','they','his','her','their','was','were',
+              'be','been','as','on','up','had','has','not','no','its','into','until',
+              'still','while','after','before','first','then','him','them','always',
+              'never','ever','just','all','this','that','too'}
+
+    y_pos = 130
+    for line in hook_lines:
+        words = line.split()
+        total_w = sum(draw.textlength(w + ' ', font=font_hook) for w in words)
+        x = max(10, (width - total_w) / 2)
+        color_idx = 0
+        for word in words:
+            clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊🔥🤝🫡😏')
+            if clean in filler:
+                color = 'white'
+            else:
+                color = word_colors[color_idx % len(word_colors)]
+                color_idx += 1
+            draw.text((x + 2, y_pos + 2), word + ' ', font=font_hook, fill=(0, 0, 0, 200))
+            draw.text((x, y_pos), word + ' ', font=font_hook, fill=color)
+            x += draw.textlength(word + ' ', font=font_hook)
+        y_pos += 52
+
+    return img
+
+
+@app.route('/download', methods=['POST'])
+def download():
+    out_dir = tempfile.mkdtemp()
+    file_id = random.choice(CLIP_IDS)
+    print(f"Downloading: {file_id}")
+
+    filepath = download_gdrive_file(file_id, out_dir)
+    if not filepath:
+        return jsonify({'error': 'Failed to download'}), 400
+
+    try:
+        hook_lines = generate_hook(filepath, out_dir, file_id)
+        print(f"Hook: {hook_lines}")
+
+        overlay_img = create_overlay_image(hook_lines)
+        overlay_path = os.path.join(out_dir, 'overlay.png')
+        overlay_img.save(overlay_path)
+
+        music_url = random.choice(MUSIC_TRACKS)
+        music_path = os.path.join(out_dir, 'music.mp3')
+        r = requests.get(music_url, timeout=30)
+        with open(music_path, 'wb') as f:
+            f.write(r.content)
+
+        output_path = os.path.join(out_dir, 'final.mp4')
+
+        ffmpeg_cmd = [
+            'ffmpeg', '-y',
+            '-i', filepath,
+            '-i', music_path,
+            '-i', overlay_path,
+            '-filter_complex',
+            '[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280[v];'
+            '[v][2:v]overlay=0:0[vt];'
+            '[0:a]volume=0.7[va];'
+            '[1:a]volume=0.3[music];'
+            '[va][music]amix=inputs=2:duration=first[aout]',
+            '-map', '[vt]',
+            '-map', '[aout]',
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-shortest',
+            '-preset', 'ultrafast',
+            '-crf', '28',
+            '-fs', '45M',
+            output_path
+        ]
+
+        proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=180)
+        print(f"FFmpeg: {proc.returncode}")
+        if proc.returncode != 0:
+            print(f"FFmpeg stderr: {proc.stderr[-300:]}")
+
+        final_path = output_path if os.path.exists(output_path) and os.path.getsize(output_path) > 10000 else filepath
+        print(f"Final size: {os.path.getsize(final_path)}")
+
+        with open(final_path, 'rb') as f:
+            caption = '\n'.join(hook_lines)
+            tg = requests.post(
+                f'https://api.telegram.org/bot{BOT_TOKEN}/sendVideo',
+                data={
+                    'chat_id': CHAT_ID,
+                    'caption': f'{caption}\n\nPress POST or SKIP',
+                    'reply_markup': '{"inline_keyboard":[[{"text":"✅ POST","callback_data":"post"},{"text":"❌ SKIP","callback_data":"skip"}]]}'
+                },
+                files={'video': ('clip.mp4', f, 'video/mp4')},
+                timeout=120
+            )
+
+        if not tg.ok:
+            return jsonify({'error': 'Telegram failed', 'details': tg.text}), 500
+
+        tg_data = tg.json()
+        telegram_file_id = tg_data.get('result', {}).get('video', {}).get('file_id', '')
+        VIDEO_STORE[telegram_file_id] = final_path
+
+        for p in [filepath, music_path, overlay_path]:
+            if os.path.exists(p):
+                try: os.remove(p)
+                except: pass
+
+        return jsonify({
+            'success': True,
+            'file_id': telegram_file_id,
+            'hook': hook_lines,
+            'video_path': final_path
+        })
+
+    except Exception as e:
+        print(f"Exception: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/get_video', methods=['GET'])
+def get_video():
+    path = request.args.get('path', '')
+    if path and os.path.exists(path):
+        return send_file(path, mimetype='video/mp4')
+    return 'Not found', 404
+
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok'})
+
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
