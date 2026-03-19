@@ -3,7 +3,7 @@ import subprocess, os, tempfile
 
 app = Flask(__name__)
 
-PROXY = "http://hrwmqwzu:aznd3fx6nczr@31.59.20.176:6754"
+PROXY = "http://hrwmqwzu:aznd3fx6nczr@45.61.118.112:5809"
 STORE = '/tmp/videos'
 os.makedirs(STORE, exist_ok=True)
 
