@@ -17,7 +17,7 @@ def download():
 
     cmd = [
         'yt-dlp',
-        '--format', 'worst[ext=mp4]/worst/best',
+        '--format', 'worstvideo[ext=mp4][filesize<8M]/worstvideo[filesize<8M]/worst[filesize<8M]/worst',
         '--no-playlist',
         '--no-check-certificate',
         '--extractor-retries', '5',
