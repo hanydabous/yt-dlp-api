@@ -8,7 +8,7 @@ app = Flask(__name__)
 PROXY = "http://hrwmqwzu:aznd3fx6nczr@45.61.118.112:5809"
 BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
 CHAT_ID = "8388528228"
-ANTHROPIC_KEY = "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"
+ANTHROPIC_KEY = os.environ.get("ANTHROPIC_KEY", "")
 
 MUSIC_TRACKS = [
     "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
@@ -17,44 +17,48 @@ MUSIC_TRACKS = [
 ]
 
 FALLBACK_CLIPS = [
-    {"query": "Suits Harvey Specter you dont send a message scene", "hook": ["He Didn't Negotiate The Price", "He Negotiated The Power! 💼"]},
-    {"query": "Mad Men Don Draper Carousel pitch scene", "hook": ["He Didn't Sell A Product", "He Sold A Feeling! 🎯"]},
-    {"query": "Wolf of Wall Street sell me this pen scene", "hook": ["Create The Need First", "Then Offer The Solution! 💰"]},
-    {"query": "Billions Bobby Axelrod I am the best scene", "hook": ["He Never Asked For Permission", "He Asked For Forgiveness After! 📈"]},
-    {"query": "Breaking Bad Walter White I am the danger scene", "hook": ["The Moment He Stopped Being", "A Victim And Became The Boss! ⚡"]},
-    {"query": "Glengarry Glen Ross coffee is for closers speech", "hook": ["He Came To Motivate Them", "But Only The Strong Survived! ☕"]},
-    {"query": "Wall Street Gordon Gekko greed is good speech", "hook": ["He Turned Greed Into", "A Business Philosophy! 💎"]},
-    {"query": "Moneyball we're gonna change the game scene", "hook": ["They Said It Was Impossible", "Until He Made It The Standard! 🏆"]},
-    {"query": "Peaky Blinders Tommy Shelby business deal scene", "hook": ["He Always Made An Offer", "They Couldn't Refuse! 🎩"]},
-    {"query": "Succession Logan Roy boardroom scene", "hook": ["He Built An Empire", "By Trusting No One! 👑"]},
+    {"query": "Suits Harvey Specter you dont send a message scene", "hook": ["He Didn't Negotiate The Price...", "He Negotiated The Power! 💼"]},
+    {"query": "Mad Men Don Draper Carousel pitch scene", "hook": ["He Didn't Sell A Product...", "He Sold A Feeling! 🎯"]},
+    {"query": "Wolf of Wall Street sell me this pen scene", "hook": ["Create The Need First...", "Then Offer The Solution! 💰"]},
+    {"query": "Billions Bobby Axelrod I am the best scene", "hook": ["He Never Asked For Permission...", "He Asked For Forgiveness After! 📈"]},
+    {"query": "Breaking Bad Walter White I am the danger scene", "hook": ["The Moment He Stopped Being A Victim...", "He Became The Boss! ⚡"]},
+    {"query": "Glengarry Glen Ross coffee is for closers speech", "hook": ["He Came To Motivate Them...", "But Only The Strong Survived! ☕"]},
+    {"query": "Wall Street Gordon Gekko greed is good speech", "hook": ["He Turned Greed Into...", "A Business Philosophy! 💎"]},
+    {"query": "Peaky Blinders Tommy Shelby business deal scene", "hook": ["He Always Made An Offer...", "They Couldn't Refuse! 🎩"]},
+    {"query": "Succession Logan Roy boardroom scene", "hook": ["He Built An Empire...", "By Trusting No One! 👑"]},
+    {"query": "Moneyball we're gonna change the game scene", "hook": ["They Said It Was Impossible...", "Until He Made It The Standard! 🏆"]},
 ]
 
+
 def generate_clip_idea():
-    """Use Claude AI to generate a fresh business lesson clip idea"""
     try:
-        prompt = """You are a viral YouTube Shorts creator. Generate ONE fresh idea for a business/money lesson clip.
+        prompt = """You are a viral YouTube Shorts creator in the style of @mdscae and @biz.surgeon.
 
-The format must be:
-- A specific famous TV show or movie SCENE to search for on YouTube (from shows like Suits, Mad Men, Breaking Bad, Billions, Succession, Peaky Blinders, Silicon Valley, The Social Network, Wolf of Wall Street, Glengarry Glen Ross, Wall Street, Moneyball, Entourage, Ozark, Shark Tank, Jerry Maguire, etc.)
-- A 2-line business lesson hook text that connects the scene to a money/business/success lesson
+Generate ONE fresh idea for a business/money/success lesson clip from a famous TV show or movie.
 
-The hook text style must match these examples exactly:
-- "He Didn't Negotiate The Price / He Negotiated The Power! 💼"
-- "They Laughed At The Idea / Until It Was Worth Billions! 💻"  
-- "She Walked In With Nothing / And Left A Millionaire! 🦈"
-- "He Turned Greed Into / A Business Philosophy! 💎"
+The hook must have PROGRESSION and CLIMAX:
+- Line 1 = the SETUP/TENSION (ends with "..." to create suspense)
+- Line 2 = the CLIMAX/PUNCHLINE (the lesson that hits hard, ends with emoji)
 
-Rules:
-- Hook line 1: setup (what happened)
-- Hook line 2: punchline/lesson with emoji
-- Scene must be a SPECIFIC iconic moment, not generic
-- Business/money/success/sales/negotiation angle always
-- Never repeat obvious scenes — be creative and varied
+Examples of perfect hooks:
+- "He Didn't Negotiate The Price..." / "He Negotiated The Power! 💼"
+- "They Laughed At The Idea..." / "Until It Was Worth Billions! 💻"
+- "She Walked In With Nothing..." / "And Left A Millionaire! 🦈"
+- "He Lost Everything Twice..." / "And Still Built An Empire! 🔥"
+- "They Came To Fire Him..." / "He Left With The Deal! 🤝"
+- "While Everyone Panicked..." / "He Was Already Positioning! 📈"
 
-Respond ONLY with valid JSON, no other text:
+Use specific iconic scenes from: Suits, Mad Men, Breaking Bad, Billions, Succession, 
+Peaky Blinders, Silicon Valley, The Social Network, Wolf of Wall Street, 
+Glengarry Glen Ross, Wall Street, Moneyball, Entourage, Ozark, Shark Tank,
+Jerry Maguire, The Godfather, American Psycho, Boiler Room, Margin Call,
+The Big Short, Two and a Half Men, Modern Family, Scrubs, House MD,
+Yellowstone, Ozark, Narcos, Boardwalk Empire, Billions, Industry
+
+Respond ONLY with valid JSON:
 {
   "query": "specific scene search query for YouTube",
-  "hook": ["Line one of hook", "Line two with emoji! 🔥"]
+  "hook": ["Line one setup with ...at end", "Line two climax with emoji! 🔥"]
 }"""
 
         response = requests.post(
@@ -74,7 +78,6 @@ Respond ONLY with valid JSON, no other text:
 
         if response.ok:
             text = response.json()['content'][0]['text'].strip()
-            # Strip markdown code fences if present
             text = text.replace('```json', '').replace('```', '').strip()
             idea = json.loads(text)
             if 'query' in idea and 'hook' in idea:
@@ -83,48 +86,48 @@ Respond ONLY with valid JSON, no other text:
     except Exception as e:
         print(f"Claude API error: {e}")
 
-    # Fallback to hardcoded list
     return random.choice(FALLBACK_CLIPS)
 
 
-def create_text_overlay(text_lines, width=1080, height=220):
+def create_line_image(text, width=1080, height=110):
+    """Create a single line of colored text as PNG"""
     img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
     try:
-        font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 46)
+        font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 48)
     except:
         font = ImageFont.load_default()
 
     word_colors = ['#FF4444', '#FFD700', '#44DDFF', '#FF8C00', '#44FF88']
     filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
               'from','is','it','he','she','they','his','her','their','was','were',
-              'be','been','as','on','up','had','has','not','no','its','into'}
+              'be','been','as','on','up','had','has','not','no','its','into','until',
+              'still','while','after','before','first','then','him','her','them'}
 
-    y_pos = 20
-    for line in text_lines:
-        words = line.split()
-        total_w = sum(draw.textlength(w + ' ', font=font) for w in words)
-        x = max(0, (width - total_w) / 2)
-        color_idx = 0
-        for word in words:
-            clean = word.lower().rstrip('!?.,:💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊✍️🎓📞🔥')
-            if clean in filler:
-                color = 'white'
-            else:
-                color = word_colors[color_idx % len(word_colors)]
-                color_idx += 1
-            draw.text((x + 2, y_pos + 2), word + ' ', font=font, fill=(0, 0, 0, 200))
-            draw.text((x, y_pos), word + ' ', font=font, fill=color)
-            x += draw.textlength(word + ' ', font=font)
-        y_pos += 65
+    words = text.split()
+    total_w = sum(draw.textlength(w + ' ', font=font) for w in words)
+    x = max(10, (width - total_w) / 2)
+    color_idx = 0
+    y = 25
+
+    for word in words:
+        clean = word.lower().rstrip('!?.,:...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊✍️🎓📞🔥')
+        if clean in filler:
+            color = 'white'
+        else:
+            color = word_colors[color_idx % len(word_colors)]
+            color_idx += 1
+        # Shadow
+        draw.text((x + 2, y + 2), word + ' ', font=font, fill=(0, 0, 0, 220))
+        draw.text((x, y), word + ' ', font=font, fill=color)
+        x += draw.textlength(word + ' ', font=font)
 
     return img
 
 
 @app.route('/download', methods=['POST'])
 def download():
-    # Generate fresh idea using Claude AI
     clip_data = generate_clip_idea()
     query = clip_data['query']
     hook_lines = clip_data['hook']
@@ -163,10 +166,17 @@ def download():
     filepath = lines_out[0]
 
     try:
-        overlay_img = create_text_overlay(hook_lines)
-        overlay_path = os.path.join(out_dir, 'overlay.png')
-        overlay_img.save(overlay_path)
+        # Line 1 = hook (shows immediately)
+        line1_img = create_line_image(hook_lines[0])
+        line1_path = os.path.join(out_dir, 'line1.png')
+        line1_img.save(line1_path)
 
+        # Line 2 = climax (fades in at 40% through the video)
+        line2_img = create_line_image(hook_lines[1])
+        line2_path = os.path.join(out_dir, 'line2.png')
+        line2_img.save(line2_path)
+
+        # Download music
         music_url = random.choice(MUSIC_TRACKS)
         music_path = os.path.join(out_dir, 'music.mp3')
         r = requests.get(music_url, timeout=30)
@@ -174,16 +184,25 @@ def download():
             f.write(r.content)
 
         output_path = os.path.join(out_dir, 'final.mp4')
+
+        # ffmpeg: crop to 9:16, line1 shows from 0s, line2 fades in at 40% duration
         ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-i', filepath,
             '-i', music_path,
-            '-i', overlay_path,
+            '-i', line1_path,
+            '-i', line2_path,
             '-filter_complex',
+            # Crop to vertical
             '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v];'
-            '[v][2:v]overlay=0:30[vt];'
-            '[0:a]volume=0.15[va];'
-            '[1:a]volume=0.6[music];'
+            # Line 1: visible from start
+            '[v][2:v]overlay=0:30:enable=\'gte(t,0)\'[v1];'
+            # Line 2: fades in at 40% of video with alpha fade
+            '[3:v]fade=in:st=0:d=0.8:alpha=1[line2fade];'
+            '[v1][line2fade]overlay=0:140:enable=\'gte(t,between(t,0,999)*0+lt(t,999))\':shortest=1[vt];'
+            # Audio: lower original, boost music
+            '[0:a]volume=0.12[va];'
+            '[1:a]volume=0.65[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
             '-map', '[vt]',
             '-map', '[aout]',
@@ -194,7 +213,33 @@ def download():
             output_path
         ]
 
-        subprocess.run(ffmpeg_cmd, capture_output=True, timeout=180)
+        proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=180)
+        
+        # If complex filter failed, use simple fallback
+        if not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
+            ffmpeg_simple = [
+                'ffmpeg', '-y',
+                '-i', filepath,
+                '-i', music_path,
+                '-i', line1_path,
+                '-i', line2_path,
+                '-filter_complex',
+                '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v];'
+                '[v][2:v]overlay=0:30[v1];'
+                '[v1][3:v]overlay=0:145[vt];'
+                '[0:a]volume=0.12[va];'
+                '[1:a]volume=0.65[music];'
+                '[va][music]amix=inputs=2:duration=first[aout]',
+                '-map', '[vt]',
+                '-map', '[aout]',
+                '-c:v', 'libx264',
+                '-c:a', 'aac',
+                '-shortest',
+                '-preset', 'fast',
+                output_path
+            ]
+            subprocess.run(ffmpeg_simple, capture_output=True, timeout=180)
+
         final_path = output_path if os.path.exists(output_path) else filepath
 
         with open(final_path, 'rb') as f:
@@ -210,7 +255,7 @@ def download():
                 timeout=120
             )
 
-        for p in [filepath, music_path, output_path, overlay_path]:
+        for p in [filepath, music_path, output_path, line1_path, line2_path]:
             if os.path.exists(p):
                 try: os.remove(p)
                 except: pass
