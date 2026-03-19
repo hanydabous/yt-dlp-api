@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import subprocess, os, tempfile, requests, random
 from PIL import Image, ImageDraw, ImageFont
 import json, base64
@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
 CHAT_ID = "8388528228"
-ANTHROPIC_KEY = os.environ.get("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", "")
+ANTHROPIC_KEY = os.environ.get("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", "")
 
 MUSIC_TRACKS = [
     "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
@@ -64,6 +64,8 @@ CLIP_IDS = [
     "1OAVaLU1C0chXTbJEcwomqipH4qJwIyJ9",
 ]
 
+VIDEO_STORE = {}
+
 
 def download_gdrive_file(file_id, out_dir):
     output_path = os.path.join(out_dir, f'{file_id}.mp4')
@@ -72,8 +74,7 @@ def download_gdrive_file(file_id, out_dir):
             'gdown', f'https://drive.google.com/uc?id={file_id}&confirm=t',
             '-O', output_path, '--quiet'
         ], capture_output=True, timeout=180)
-        print(f"gdown returncode: {result.returncode}")
-        print(f"gdown stderr: {result.stderr[-300:]}")
+        print(f"gdown code: {result.returncode}")
         if os.path.exists(output_path) and os.path.getsize(output_path) > 10000:
             print(f"Downloaded: {os.path.getsize(output_path)} bytes")
             return output_path
@@ -111,6 +112,7 @@ Look at this frame from a business/money/success video clip. Write a 2-line hook
   "While Everyone Panicked..." / "He Was Already Positioning! 📈"
   "Always Looks Easy Money..." / "Until The Work Actually Begins! 🌀"
   "She Showed Kindness In Business..." / "And It Always Paid Off! 🤝"
+  "He Manipulated His Clients Into The Sale..." / "Without Even Realizing It! 😏"
 
 Respond ONLY with valid JSON:
 {"hook": ["Line one setup...", "Line two punchline! 💰"]}"""
@@ -198,11 +200,11 @@ def create_line_image(text, width=1080, height=115):
 def download():
     out_dir = tempfile.mkdtemp()
     file_id = random.choice(CLIP_IDS)
-    print(f"Downloading file ID: {file_id}")
+    print(f"Downloading: {file_id}")
 
     filepath = download_gdrive_file(file_id, out_dir)
     if not filepath:
-        return jsonify({'error': 'Failed to download from Google Drive'}), 400
+        return jsonify({'error': 'Failed to download'}), 400
 
     try:
         hook_lines = generate_hook(filepath, out_dir, file_id)
@@ -231,9 +233,9 @@ def download():
             '-i', line1_path,
             '-i', line2_path,
             '-filter_complex',
-            '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v];'
-            '[v][2:v]overlay=0:30[v1];'
-            '[v1][3:v]overlay=0:148[vt];'
+            '[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280[v];'
+            '[v][2:v]overlay=0:20[v1];'
+            '[v1][3:v]overlay=0:100[vt];'
             '[0:a]volume=0.1[va];'
             '[1:a]volume=0.7[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
@@ -243,17 +245,20 @@ def download():
             '-c:a', 'aac',
             '-shortest',
             '-preset', 'ultrafast',
+            '-crf', '28',
+            '-fs', '45M',
             output_path
         ]
 
         proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=180)
-        print(f"FFmpeg code: {proc.returncode}")
+        print(f"FFmpeg: {proc.returncode}")
         if proc.returncode != 0:
-            print(f"FFmpeg error: {proc.stderr[-500:]}")
+            print(f"FFmpeg error: {proc.stderr[-300:]}")
 
         final_path = output_path if os.path.exists(output_path) and os.path.getsize(output_path) > 10000 else filepath
-        print(f"Sending: {final_path}, size: {os.path.getsize(final_path)}")
+        print(f"Final size: {os.path.getsize(final_path)}")
 
+        # Send to Telegram
         with open(final_path, 'rb') as f:
             caption = '\n'.join(hook_lines)
             tg = requests.post(
@@ -267,20 +272,38 @@ def download():
                 timeout=120
             )
 
-        for p in [filepath, music_path, output_path, line1_path, line2_path]:
+        if not tg.ok:
+            return jsonify({'error': 'Telegram failed', 'details': tg.text}), 500
+
+        tg_data = tg.json()
+        telegram_file_id = tg_data.get('result', {}).get('video', {}).get('file_id', '')
+
+        # Store video path for YouTube upload
+        VIDEO_STORE[telegram_file_id] = final_path
+
+        for p in [filepath, music_path, line1_path, line2_path]:
             if os.path.exists(p):
                 try: os.remove(p)
                 except: pass
 
-        if tg.ok:
-            file_id = tg.json().get('result', {}).get('video', {}).get('file_id', '')
-            return jsonify({'success': True, 'file_id': file_id, 'hook': hook_lines})
-        else:
-            return jsonify({'error': 'Telegram failed', 'details': tg.text}), 500
+        return jsonify({
+            'success': True,
+            'file_id': telegram_file_id,
+            'hook': hook_lines,
+            'video_path': final_path
+        })
 
     except Exception as e:
         print(f"Exception: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/get_video', methods=['GET'])
+def get_video():
+    path = request.args.get('path', '')
+    if path and os.path.exists(path):
+        return send_file(path, mimetype='video/mp4')
+    return 'Not found', 404
 
 
 @app.route('/health', methods=['GET'])
