@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
 CHAT_ID = "8388528228"
-ANTHROPIC_KEY = os.environ.get("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", "")
+ANTHROPIC_KEY = os.environ.get("ANTHROPIC_KEY", "")
 
 MUSIC_TRACKS = [
     '/app/music1.mp3',
@@ -166,7 +166,6 @@ Respond ONLY with valid JSON:
 
 
 def create_overlay_image(hook_lines, width=720, height=155):
-    """Compact overlay - logo+name top, hook text right above video"""
     img = Image.new('RGBA', (width, height), (0, 0, 0, 255))
     draw = ImageDraw.Draw(img)
 
@@ -179,7 +178,6 @@ def create_overlay_image(hook_lines, width=720, height=155):
         font_handle = font_name
         font_hook = font_name
 
-    # Logo - circular, left side
     logo_size = 55
     logo_x, logo_y = 10, 8
     try:
@@ -190,7 +188,6 @@ def create_overlay_image(hook_lines, width=720, height=155):
         mask_draw = ID.Draw(mask)
         mask_draw.ellipse((0, 0, logo_size, logo_size), fill=255)
         logo.putalpha(mask)
-        # Instagram gradient border
         draw.ellipse(
             (logo_x - 2, logo_y - 2, logo_x + logo_size + 2, logo_y + logo_size + 2),
             outline='#E1306C', width=2
@@ -200,15 +197,12 @@ def create_overlay_image(hook_lines, width=720, height=155):
         print(f"Logo error: {e}")
         draw.ellipse((logo_x, logo_y, logo_x + logo_size, logo_y + logo_size), fill='#FFD700')
 
-    # Name + blue checkmark
     name_x = logo_x + logo_size + 10
     draw.text((name_x, logo_y + 4), "MillionDollarScenes™", font=font_name, fill='white')
     check_w = draw.textlength("MillionDollarScenes™", font=font_name)
     draw.text((name_x + check_w + 5, logo_y + 4), "✓", font=font_name, fill='#1DA1F2')
-    # Handle
     draw.text((name_x, logo_y + 32), "@MillionDollarScenes", font=font_handle, fill=(170, 170, 170, 255))
 
-    # Hook text - tight, right above video
     word_colors = ['#FF4444', '#FFD700', '#44DDFF', '#FF8C00', '#44FF88']
     filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
               'from','is','it','he','she','they','his','her','their','was','were',
@@ -260,8 +254,7 @@ def download():
 
         output_path = os.path.join(out_dir, 'final.mp4')
 
-        # overlay height is 155px, video fills remaining 1125px of 1280
-ffmpeg_cmd = [
+        ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-i', filepath,
             '-i', music_path,
@@ -274,6 +267,16 @@ ffmpeg_cmd = [
             '[0:a]volume=0.75[va];'
             '[1:a]volume=0.25[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
+            '-map', '[vt]',
+            '-map', '[aout]',
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-shortest',
+            '-preset', 'ultrafast',
+            '-crf', '28',
+            '-fs', '45M',
+            output_path
+        ]
 
         proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=180)
         print(f"FFmpeg: {proc.returncode}")
