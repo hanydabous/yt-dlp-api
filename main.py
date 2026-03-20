@@ -10,9 +10,9 @@ CHAT_ID = "8388528228"
 ANTHROPIC_KEY = os.environ.get("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", "")
 
 MUSIC_TRACKS = [
-    "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
-    "https://cdn.pixabay.com/audio/2022/01/18/audio_d0c6ff1bab.mp3",
-    "https://cdn.pixabay.com/audio/2021/11/13/audio_cb4f5da9a6.mp3",
+    '/app/music1.mp3',
+    '/app/music2.mp3',
+    '/app/music3.mp3',
 ]
 
 CLIP_IDS = [
@@ -245,11 +245,8 @@ def download():
         overlay_path = os.path.join(out_dir, 'overlay.png')
         overlay_img.save(overlay_path)
 
-        music_url = random.choice(MUSIC_TRACKS)
-        music_path = os.path.join(out_dir, 'music.mp3')
-        r = requests.get(music_url, timeout=30)
-        with open(music_path, 'wb') as f:
-            f.write(r.content)
+        music_path = random.choice(MUSIC_TRACKS)
+        print(f"Using music: {music_path}")
 
         output_path = os.path.join(out_dir, 'final.mp4')
 
@@ -303,7 +300,7 @@ def download():
         telegram_file_id = tg_data.get('result', {}).get('video', {}).get('file_id', '')
         VIDEO_STORE[telegram_file_id] = final_path
 
-        for p in [filepath, music_path, overlay_path]:
+        for p in [filepath, overlay_path]:
             if os.path.exists(p):
                 try: os.remove(p)
                 except: pass
