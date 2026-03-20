@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
 CHAT_ID = "8388528228"
-ANTHROPIC_KEY = os.environ.get("ANTHROPIC_KEY", "")
+ANTHROPIC_KEY = os.environ.get("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", "")
 
 MUSIC_TRACKS = [
     '/app/music1.mp3',
@@ -260,10 +260,10 @@ def download():
             '-i', music_path,
             '-i', overlay_path,
             '-filter_complex',
-            '[0:v]scale=720:1125:force_original_aspect_ratio=increase,crop=720:1125[v];'
-            '[v]pad=720:1280:0:155:black[vp];'
+            '[0:v]scale=720:1080:force_original_aspect_ratio=increase,crop=720:1080[v];'
+            '[v]pad=720:1280:0:175:black[vp];'
             '[2:v]scale=720:155[overlay];'
-            '[vp][overlay]overlay=0:0[vt];'
+            '[vp][overlay]overlay=0:20[vt];'
             '[0:a]volume=0.75[va];'
             '[1:a]volume=0.25[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
