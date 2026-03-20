@@ -66,6 +66,10 @@ CLIP_IDS = [
 
 VIDEO_STORE = {}
 
+OVERLAY_HEIGHT = 170
+VIDEO_HEIGHT = 900
+BOTTOM_BAR = 1280 - OVERLAY_HEIGHT - VIDEO_HEIGHT  # 210px black at bottom
+
 
 def download_gdrive_file(file_id, out_dir):
     output_path = os.path.join(out_dir, f'{file_id}.mp4')
@@ -97,37 +101,35 @@ def generate_hook(filepath, out_dir, file_id):
             with open(frame_path, 'rb') as f:
                 img_data = base64.b64encode(f.read()).decode()
 
-            prompt = """You are creating a viral YouTube Short exactly like @biz.surgeon and @mdscae.
+            prompt = """You are creating a viral YouTube Short exactly like @biz.surgeon.
 
-STEP 1 - Look at this frame and identify:
-- Exact setting (car dealership, office, street, restaurant, gym, casino, courtroom, etc)
-- Who is in the scene (man in suit, woman in business attire, group of friends, athlete, etc)
-- What is literally happening (negotiating, arguing, showing off, celebrating, being rejected, making a deal, etc)
-- The emotion (confident, shocked, determined, nervous, powerful, etc)
+STEP 1 - Look at this frame and identify EXACTLY:
+- Setting (car dealership, office, street, restaurant, gym, casino, courtroom, hotel, etc)
+- Characters (man in suit, athlete, couple, boss, salesman, etc)
+- What is literally happening (negotiating, arguing, celebrating, being rejected, making a deal, driving, counting money, etc)
+- Emotion (confident, shocked, determined, nervous, powerful, angry, calm, etc)
 
-STEP 2 - Write a 2-line hook where:
-- Line 1 describes EXACTLY what is happening in the scene (ends with "...")
-- Line 2 delivers the business/money/life lesson that matches (ends with emoji)
+STEP 2 - Write a 2-line hook that DIRECTLY matches what you see:
+- Line 1 = describes EXACTLY what is happening in the scene (ends with "...")
+- Line 2 = the business/money/life lesson from that exact scene (ends with emoji)
 
-CRITICAL RULES:
-- The hook MUST match what you actually see
-- If you see a car dealership → write about cars/deals/wealth
-- If you see an office/boardroom → write about business/power/negotiation
-- If you see someone confident → write about confidence/mindset
-- If you see money/luxury → write about wealth/success
-- Capitalize Every Word
-- Max 8 words per line
-- Line 1 ends with "..."
-- Line 2 ends with relevant emoji
+RULES:
+- Hook MUST match the visual scene — no generic hooks
+- Car dealership → cars/wealth/deals
+- Boardroom/office → business/power/negotiation
+- Street/outdoor → hustle/grind/success
+- Luxury setting → wealth/status/achievement
+- Capitalize Every Word, max 8 words per line
 
-GOOD EXAMPLES:
-Car dealership man in sports car: "He Walked In And Chose The Best..." / "Money Was Never The Issue! 💰"
-Two men negotiating outdoors: "He Made The Offer They Couldn't Refuse..." / "That's How Real Deals Are Made! 🤝"
-Woman walking into boardroom: "She Walked In Like She Owned It..." / "Because She Actually Did! 👑"
-Man counting money: "While They Were Sleeping..." / "He Was Already Counting! 💵"
+EXAMPLES matched to scenes:
+Car dealership, man in sports car: "He Walked In And Chose The Best..." / "Money Was Never The Issue! 💰"
+Two suits negotiating outside: "He Made The Offer They Couldn't Refuse..." / "That's How Real Deals Are Made! 🤝"
+Woman entering boardroom confidently: "She Walked In Like She Owned It..." / "Because She Actually Did! 👑"
+Man alone counting cash: "While They Were Sleeping..." / "He Was Already Counting! 💵"
+Hotel/corridor confrontation: "He Blocked Every Exit..." / "And Still Found The Way Out! 🔥"
 
-Respond ONLY with valid JSON:
-{"hook": ["Line one...", "Line two! 💰"]}"""
+Respond ONLY with valid JSON, nothing else:
+{"hook": ["Line one setup...", "Line two lesson! 💰"]}"""
 
             response = requests.post(
                 "https://api.anthropic.com/v1/messages",
@@ -171,13 +173,9 @@ Respond ONLY with valid JSON:
     return random.choice(fallbacks)
 
 
-def create_overlay_image(hook_lines, width=720):
-    # Calculate exact height needed based on content
-    # Logo row: 65px, hook text: 2 lines x 42px = 84px, padding: 20px
-    # Total: 65 + 84 + 20 = 169px → use 170px
-    height = 170
-
-    img = Image.new('RGBA', (width, height), (0, 0, 0, 255))
+def create_overlay_image(hook_lines, width=720, height=OVERLAY_HEIGHT):
+    """Black banner - exact height, no wasted space"""
+    img = Image.new('RGB', (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(img)
 
     try:
@@ -189,7 +187,7 @@ def create_overlay_image(hook_lines, width=720):
         font_handle = font_name
         font_hook = font_name
 
-    # Logo row - compact
+    # Logo
     logo_size = 58
     logo_x, logo_y = 12, 8
     try:
@@ -197,25 +195,22 @@ def create_overlay_image(hook_lines, width=720):
         logo = logo.resize((logo_size, logo_size))
         mask = Image.new('L', (logo_size, logo_size), 0)
         from PIL import ImageDraw as ID
-        mask_draw = ID.Draw(mask)
-        mask_draw.ellipse((0, 0, logo_size, logo_size), fill=255)
+        md = ID.Draw(mask)
+        md.ellipse((0, 0, logo_size, logo_size), fill=255)
         logo.putalpha(mask)
-        draw.ellipse(
-            (logo_x - 2, logo_y - 2, logo_x + logo_size + 2, logo_y + logo_size + 2),
-            outline='#E1306C', width=2
-        )
+        draw.ellipse((logo_x-2, logo_y-2, logo_x+logo_size+2, logo_y+logo_size+2), outline='#E1306C', width=2)
         img.paste(logo, (logo_x, logo_y), logo)
     except Exception as e:
         print(f"Logo error: {e}")
-        draw.ellipse((logo_x, logo_y, logo_x + logo_size, logo_y + logo_size), fill='#FFD700')
 
+    # Name + checkmark + handle
     name_x = logo_x + logo_size + 12
     draw.text((name_x, logo_y + 5), "MillionDollarScenes™", font=font_name, fill='white')
-    check_w = draw.textlength("MillionDollarScenes™", font=font_name)
-    draw.text((name_x + check_w + 6, logo_y + 5), "✓", font=font_name, fill='#1DA1F2')
-    draw.text((name_x, logo_y + 35), "@MillionDollarScenes", font=font_handle, fill=(170, 170, 170, 255))
+    cw = draw.textlength("MillionDollarScenes™", font=font_name)
+    draw.text((name_x + cw + 6, logo_y + 5), "✓", font=font_name, fill='#1DA1F2')
+    draw.text((name_x, logo_y + 35), "@MillionDollarScenes", font=font_handle, fill=(170, 170, 170))
 
-    # Hook text starts immediately after logo row
+    # Hook text - centered, right after logo row
     word_colors = ['#FF4444', '#FFD700', '#44DDFF', '#FF8C00', '#44FF88']
     filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
               'from','is','it','he','she','they','his','her','their','was','were',
@@ -223,8 +218,7 @@ def create_overlay_image(hook_lines, width=720):
               'still','while','after','before','first','then','him','them','always',
               'never','ever','just','all','this','that','too'}
 
-    # Hook text right after logo section
-    y_pos = 78
+    y_pos = 82
     for line in hook_lines:
         words = line.split()
         total_w = sum(draw.textlength(w + ' ', font=font_hook) for w in words)
@@ -232,17 +226,15 @@ def create_overlay_image(hook_lines, width=720):
         color_idx = 0
         for word in words:
             clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊🔥🤝🫡😏🃏🚗')
-            if clean in filler:
-                color = 'white'
-            else:
-                color = word_colors[color_idx % len(word_colors)]
+            color = 'white' if clean in filler else word_colors[color_idx % len(word_colors)]
+            if clean not in filler:
                 color_idx += 1
-            draw.text((x + 2, y_pos + 2), word + ' ', font=font_hook, fill=(0, 0, 0, 200))
-            draw.text((x, y_pos), word + ' ', font=font_hook, fill=color)
-            x += draw.textlength(word + ' ', font=font_hook)
+            draw.text((x+2, y_pos+2), word+' ', font=font_hook, fill=(0, 0, 0))
+            draw.text((x, y_pos), word+' ', font=font_hook, fill=color)
+            x += draw.textlength(word+' ', font=font_hook)
         y_pos += 44
 
-    return img, height
+    return img
 
 
 @app.route('/download', methods=['POST'])
@@ -259,27 +251,31 @@ def download():
         hook_lines = generate_hook(filepath, out_dir, file_id)
         print(f"Hook: {hook_lines}")
 
-        overlay_img, overlay_height = create_overlay_image(hook_lines)
+        overlay_img = create_overlay_image(hook_lines)
         overlay_path = os.path.join(out_dir, 'overlay.png')
         overlay_img.save(overlay_path)
 
-        video_height = 1280 - overlay_height  # exactly fills remaining space
-
         music_path = random.choice(MUSIC_TRACKS)
-        print(f"Using music: {music_path}, overlay_height: {overlay_height}")
-
         output_path = os.path.join(out_dir, 'final.mp4')
 
+        # vstack: overlay (170px) + video (900px) + black bottom (210px) = 1280px
+        # Using vstack guarantees ZERO gap between overlay and video
         ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-i', filepath,
             '-i', music_path,
             '-i', overlay_path,
             '-filter_complex',
-            f'[0:v]scale=720:{video_height}:force_original_aspect_ratio=increase,crop=720:{video_height}[v];'
-            f'[v]pad=720:1280:0:{overlay_height}:black[vp];'
-            f'[2:v]scale=720:{overlay_height}[overlay];'
-            f'[vp][overlay]overlay=0:0[vt];'
+            # Scale video to exactly 720x900
+            f'[0:v]scale=720:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,'
+            f'crop=720:{VIDEO_HEIGHT}[vid];'
+            # Add 210px black bar at bottom of video
+            f'[vid]pad=720:{VIDEO_HEIGHT + BOTTOM_BAR}:0:0:black[vidpad];'
+            # Scale overlay to 720x170
+            f'[2:v]scale=720:{OVERLAY_HEIGHT}[top];'
+            # Stack overlay on top of video — ZERO GAP GUARANTEED
+            f'[top][vidpad]vstack=inputs=2[vt];'
+            # Audio mix
             '[0:a]volume=0.75[va];'
             '[1:a]volume=0.25[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
