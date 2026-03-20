@@ -99,19 +99,19 @@ def generate_hook(filepath, out_dir, file_id):
 
             prompt = """You are creating a viral YouTube Short in the style of @biz.surgeon.
 
-Look at this frame from a business/money/success video clip. Write a 2-line hook.
+Look at this frame carefully. Identify exactly what is happening in the scene - who the characters are, what they are doing, the emotion, the setting. Then write a 2-line business hook that DIRECTLY matches what you see happening in this specific scene.
 
-- Line 1 = SETUP (ends with "...")
-- Line 2 = PUNCHLINE with business lesson (ends with emoji)
+Rules:
+- Line 1 = SETUP that describes what is literally happening in the scene (ends with "...")
+- Line 2 = PUNCHLINE with the business/money/life lesson from that scene (ends with emoji)
 - Capitalize Every Word, max 8 words per line
-- Examples:
-  "He Didn't Negotiate The Price..." / "He Negotiated The Power! 💼"
-  "They Laughed At The Idea..." / "Until It Was Worth Billions! 💻"
-  "While Everyone Panicked..." / "He Was Already Positioning! 📈"
-  "Always Looks Easy Money..." / "Until The Work Actually Begins! 🌀"
-  "She Showed Kindness In Business..." / "And It Always Paid Off! 🤝"
-  "He Manipulated His Clients Into The Sale..." / "Without Even Realizing It! 😏"
-  "They Found Money Inside Cans..." / "And Turned A Dream Into Reality! 😤"
+- The hook MUST make sense with what is visually happening in the scene
+- Examples of good hooks matched to scenes:
+  Casino scene: "He Bet Everything On One Hand..." / "And Changed His Life Forever! 🃏"
+  Boardroom scene: "They Tried To Vote Him Out..." / "He Owned The Room Instead! 💼"
+  Sales scene: "She Asked For A $50 Million Raise..." / "And They Said Yes! 💰"
+  Street scene: "He Started With Nothing..." / "And Built An Empire Anyway! 👑"
+  Restaurant scene: "They Found Money Inside Cans..." / "And Turned A Dream Into Reality! 😤"
 
 Respond ONLY with valid JSON:
 {"hook": ["Line one setup...", "Line two punchline! 💰"]}"""
@@ -160,21 +160,21 @@ Respond ONLY with valid JSON:
     return random.choice(fallbacks)
 
 
-def create_overlay_image(hook_lines, width=720, height=240):
+def create_overlay_image(hook_lines, width=720, height=200):
     img = Image.new('RGBA', (width, height), (0, 0, 0, 255))
     draw = ImageDraw.Draw(img)
 
     try:
-        font_name = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 32)
-        font_handle = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 26)
-        font_hook = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 36)
+        font_name = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 28)
+        font_handle = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 22)
+        font_hook = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 34)
     except:
         font_name = ImageFont.load_default()
         font_handle = font_name
         font_hook = font_name
 
-    logo_size = 80
-    logo_x, logo_y = 15, 15
+    logo_size = 65
+    logo_x, logo_y = 12, 10
     try:
         logo = Image.open('/app/logo.png').convert('RGBA')
         logo = logo.resize((logo_size, logo_size))
@@ -183,21 +183,20 @@ def create_overlay_image(hook_lines, width=720, height=240):
         mask_draw = ID.Draw(mask)
         mask_draw.ellipse((0, 0, logo_size, logo_size), fill=255)
         logo.putalpha(mask)
-        border_draw = ImageDraw.Draw(img)
-        border_draw.ellipse(
+        draw.ellipse(
             (logo_x - 3, logo_y - 3, logo_x + logo_size + 3, logo_y + logo_size + 3),
-            outline='#E1306C', width=3
+            outline='#E1306C', width=2
         )
         img.paste(logo, (logo_x, logo_y), logo)
     except Exception as e:
         print(f"Logo error: {e}")
         draw.ellipse((logo_x, logo_y, logo_x + logo_size, logo_y + logo_size), fill='#FFD700')
 
-    name_x = logo_x + logo_size + 15
-    draw.text((name_x, logo_y + 8), "MillionDollarScenes™", font=font_name, fill='white')
+    name_x = logo_x + logo_size + 12
+    draw.text((name_x, logo_y + 6), "MillionDollarScenes™", font=font_name, fill='white')
     check_w = draw.textlength("MillionDollarScenes™", font=font_name)
-    draw.text((name_x + check_w + 8, logo_y + 8), "✓", font=font_name, fill='#1DA1F2')
-    draw.text((name_x, logo_y + 46), "@MillionDollarScenes", font=font_handle, fill=(180, 180, 180, 255))
+    draw.text((name_x + check_w + 6, logo_y + 6), "✓", font=font_name, fill='#1DA1F2')
+    draw.text((name_x, logo_y + 36), "@MillionDollarScenes", font=font_handle, fill=(180, 180, 180, 255))
 
     word_colors = ['#FF4444', '#FFD700', '#44DDFF', '#FF8C00', '#44FF88']
     filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
@@ -206,7 +205,7 @@ def create_overlay_image(hook_lines, width=720, height=240):
               'still','while','after','before','first','then','him','them','always',
               'never','ever','just','all','this','that','too'}
 
-    y_pos = 130
+    y_pos = 108
     for line in hook_lines:
         words = line.split()
         total_w = sum(draw.textlength(w + ' ', font=font_hook) for w in words)
@@ -222,7 +221,7 @@ def create_overlay_image(hook_lines, width=720, height=240):
             draw.text((x + 2, y_pos + 2), word + ' ', font=font_hook, fill=(0, 0, 0, 200))
             draw.text((x, y_pos), word + ' ', font=font_hook, fill=color)
             x += draw.textlength(word + ' ', font=font_hook)
-        y_pos += 52
+        y_pos += 46
 
     return img
 
@@ -258,8 +257,8 @@ def download():
             '-filter_complex',
             '[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280[v];'
             '[v][2:v]overlay=0:0[vt];'
-            '[0:a]volume=0.7[va];'
-            '[1:a]volume=0.3[music];'
+            '[0:a]volume=0.75[va];'
+            '[1:a]volume=0.25[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
             '-map', '[vt]',
             '-map', '[aout]',
