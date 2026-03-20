@@ -97,31 +97,38 @@ def generate_hook(filepath, out_dir, file_id):
             with open(frame_path, 'rb') as f:
                 img_data = base64.b64encode(f.read()).decode()
 
-            prompt = """You are creating a viral YouTube Short in the style of @biz.surgeon.
+            prompt = """You are creating a viral YouTube Short exactly like @biz.surgeon and @mdscae.
 
-Look at this frame carefully. Identify EXACTLY what is happening:
-- What is the setting? (office, street, casino, restaurant, car, etc)
-- Who are the characters? (businessman, salesman, couple, boss, employee, etc)
-- What emotion or action is happening?
+STEP 1 - Look at this frame and identify:
+- Exact setting (car dealership, office, street, restaurant, gym, casino, courtroom, etc)
+- Who is in the scene (man in suit, woman in business attire, group of friends, athlete, etc)
+- What is literally happening (negotiating, arguing, showing off, celebrating, being rejected, making a deal, etc)
+- The emotion (confident, shocked, determined, nervous, powerful, etc)
 
-Then write a 2-line hook that DIRECTLY matches what you see. The hook must make logical sense with the scene.
+STEP 2 - Write a 2-line hook where:
+- Line 1 describes EXACTLY what is happening in the scene (ends with "...")
+- Line 2 delivers the business/money/life lesson that matches (ends with emoji)
 
-Rules:
-- Line 1 = SETUP describing what is literally happening (ends with "...")
-- Line 2 = PUNCHLINE with the business/money lesson (ends with emoji)
-- Capitalize Every Word, max 8 words per line
-- MUST match the visual scene
+CRITICAL RULES:
+- The hook MUST match what you actually see — don't use generic hooks
+- If you see a car dealership scene → write about cars/deals/wealth
+- If you see an office/boardroom → write about business/power/negotiation  
+- If you see someone being confident → write about confidence/mindset
+- If you see money/luxury → write about wealth/success
+- Capitalize Every Word
+- Max 8 words per line
+- Line 1 ends with "..."
+- Line 2 ends with relevant emoji
 
-Scene-matched examples:
-- Two men talking outside in suits: "He Came To Make A Deal..." / "But Left With The Upper Hand! 💼"
-- Casino/gambling scene: "He Bet Everything On One Move..." / "And It Paid Off! 🃏"
-- Office boardroom: "They Tried To Push Him Out..." / "He Owned The Room Instead! 👑"
-- Car/driving scene: "He Built His Empire..." / "One Deal At A Time! 🚗"
-- Restaurant scene: "They Laughed At His Idea..." / "Until It Made Millions! 💰"
-- Street/outdoor: "He Started With Nothing..." / "And Changed Everything! 🔥"
+GOOD EXAMPLES matched to scenes:
+Car dealership with man sitting in sports car: "He Walked In And Chose The Best..." / "Money Was Never The Issue! 💰"
+Two men negotiating in suits outdoors: "He Made The Offer They Couldn't Refuse..." / "That's How Real Deals Are Made! 🤝"
+Woman confidently walking into boardroom: "She Walked In Like She Owned It..." / "Because She Actually Did! 👑"
+Man counting money alone: "While They Were Sleeping..." / "He Was Already Counting! 💵"
+Group celebrating a win: "They Said It Would Never Happen..." / "Until The Day It Did! 🔥"
 
 Respond ONLY with valid JSON:
-{"hook": ["Line one setup...", "Line two punchline! 💰"]}"""
+{"hook": ["Line one...", "Line two! 💰"]}"""
 
             response = requests.post(
                 "https://api.anthropic.com/v1/messages",
@@ -132,7 +139,7 @@ Respond ONLY with valid JSON:
                 },
                 json={
                     "model": "claude-sonnet-4-20250514",
-                    "max_tokens": 150,
+                    "max_tokens": 200,
                     "messages": [{
                         "role": "user",
                         "content": [
@@ -165,7 +172,7 @@ Respond ONLY with valid JSON:
     return random.choice(fallbacks)
 
 
-def create_overlay_image(hook_lines, width=720, height=200):
+def create_overlay_image(hook_lines, width=720, height=130):
     img = Image.new('RGBA', (width, height), (0, 0, 0, 255))
     draw = ImageDraw.Draw(img)
 
@@ -179,7 +186,7 @@ def create_overlay_image(hook_lines, width=720, height=200):
         font_hook = font_name
 
     logo_size = 55
-    logo_x, logo_y = 10, 10
+    logo_x, logo_y = 10, 5
     try:
         logo = Image.open('/app/logo.png').convert('RGBA')
         logo = logo.resize((logo_size, logo_size))
@@ -198,10 +205,10 @@ def create_overlay_image(hook_lines, width=720, height=200):
         draw.ellipse((logo_x, logo_y, logo_x + logo_size, logo_y + logo_size), fill='#FFD700')
 
     name_x = logo_x + logo_size + 10
-    draw.text((name_x, logo_y + 4), "MillionDollarScenes™", font=font_name, fill='white')
+    draw.text((name_x, logo_y + 2), "MillionDollarScenes™", font=font_name, fill='white')
     check_w = draw.textlength("MillionDollarScenes™", font=font_name)
-    draw.text((name_x + check_w + 5, logo_y + 4), "✓", font=font_name, fill='#1DA1F2')
-    draw.text((name_x, logo_y + 32), "@MillionDollarScenes", font=font_handle, fill=(170, 170, 170, 255))
+    draw.text((name_x + check_w + 5, logo_y + 2), "✓", font=font_name, fill='#1DA1F2')
+    draw.text((name_x, logo_y + 30), "@MillionDollarScenes", font=font_handle, fill=(170, 170, 170, 255))
 
     word_colors = ['#FF4444', '#FFD700', '#44DDFF', '#FF8C00', '#44FF88']
     filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
@@ -210,7 +217,7 @@ def create_overlay_image(hook_lines, width=720, height=200):
               'still','while','after','before','first','then','him','them','always',
               'never','ever','just','all','this','that','too'}
 
-    y_pos = 110
+    y_pos = 60
     for line in hook_lines:
         words = line.split()
         total_w = sum(draw.textlength(w + ' ', font=font_hook) for w in words)
@@ -226,7 +233,7 @@ def create_overlay_image(hook_lines, width=720, height=200):
             draw.text((x + 2, y_pos + 2), word + ' ', font=font_hook, fill=(0, 0, 0, 200))
             draw.text((x, y_pos), word + ' ', font=font_hook, fill=color)
             x += draw.textlength(word + ' ', font=font_hook)
-        y_pos += 42
+        y_pos += 38
 
     return img
 
@@ -260,9 +267,9 @@ def download():
             '-i', music_path,
             '-i', overlay_path,
             '-filter_complex',
-            '[0:v]scale=720:1080:force_original_aspect_ratio=increase,crop=720:1080[v];'
-            '[v]pad=720:1280:0:200:black[vp];'
-            '[2:v]scale=720:200[overlay];'
+            '[0:v]scale=720:1150:force_original_aspect_ratio=increase,crop=720:1150[v];'
+            '[v]pad=720:1280:0:130:black[vp];'
+            '[2:v]scale=720:130[overlay];'
             '[vp][overlay]overlay=0:0[vt];'
             '[0:a]volume=0.75[va];'
             '[1:a]volume=0.25[music];'
