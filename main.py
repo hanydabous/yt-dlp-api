@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 BOT_TOKEN = "8708552965:AAHnIat8255nA-UqSi5KAha-fcFwOWWsib0"
 CHAT_ID = "8388528228"
-ANTHROPIC_KEY = os.environ.get("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", "")
+ANTHROPIC_KEY = os.environ.get("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", "")
 
 MUSIC_TRACKS = [
     '/app/music1.mp3',
@@ -99,19 +99,26 @@ def generate_hook(filepath, out_dir, file_id):
 
             prompt = """You are creating a viral YouTube Short in the style of @biz.surgeon.
 
-Look at this frame carefully. Identify exactly what is happening in the scene - who the characters are, what they are doing, the emotion, the setting. Then write a 2-line business hook that DIRECTLY matches what you see happening in this specific scene.
+Look at this frame carefully. Identify EXACTLY what is happening:
+- What is the setting? (office, street, casino, restaurant, car, etc)
+- Who are the characters? (businessman, salesman, couple, boss, employee, etc)
+- What emotion or action is happening?
+
+Then write a 2-line hook that DIRECTLY matches what you see. The hook must make logical sense with the scene.
 
 Rules:
-- Line 1 = SETUP that describes what is literally happening in the scene (ends with "...")
-- Line 2 = PUNCHLINE with the business/money/life lesson from that scene (ends with emoji)
+- Line 1 = SETUP describing what is literally happening (ends with "...")
+- Line 2 = PUNCHLINE with the business/money lesson (ends with emoji)
 - Capitalize Every Word, max 8 words per line
-- The hook MUST make sense with what is visually happening in the scene
-- Examples of good hooks matched to scenes:
-  Casino scene: "He Bet Everything On One Hand..." / "And Changed His Life Forever! 🃏"
-  Boardroom scene: "They Tried To Vote Him Out..." / "He Owned The Room Instead! 💼"
-  Sales scene: "She Asked For A $50 Million Raise..." / "And They Said Yes! 💰"
-  Street scene: "He Started With Nothing..." / "And Built An Empire Anyway! 👑"
-  Restaurant scene: "They Found Money Inside Cans..." / "And Turned A Dream Into Reality! 😤"
+- MUST match the visual scene
+
+Scene-matched examples:
+- Two men talking outside in suits: "He Came To Make A Deal..." / "But Left With The Upper Hand! 💼"
+- Casino/gambling scene: "He Bet Everything On One Move..." / "And It Paid Off! 🃏"
+- Office boardroom: "They Tried To Push Him Out..." / "He Owned The Room Instead! 👑"
+- Car/driving scene: "He Built His Empire..." / "One Deal At A Time! 🚗"
+- Restaurant scene: "They Laughed At His Idea..." / "Until It Made Millions! 💰"
+- Street/outdoor: "He Started With Nothing..." / "And Changed Everything! 🔥"
 
 Respond ONLY with valid JSON:
 {"hook": ["Line one setup...", "Line two punchline! 💰"]}"""
@@ -154,27 +161,27 @@ Respond ONLY with valid JSON:
         ["The Smartest Move In The Room...", "Was Playing Dumb! 🧠"],
         ["He Lost It All Once...", "And Built It Back Bigger! 🔥"],
         ["They Came To Shut Him Down...", "He Left With The Contract! 🤝"],
-        ["She Walked In With Nothing...", "And Left A Partner! 🦈"],
-        ["He Never Asked For Permission...", "He Asked For Forgiveness After! 👑"],
     ]
     return random.choice(fallbacks)
 
 
-def create_overlay_image(hook_lines, width=720, height=200):
+def create_overlay_image(hook_lines, width=720, height=155):
+    """Compact overlay - logo+name top, hook text right above video"""
     img = Image.new('RGBA', (width, height), (0, 0, 0, 255))
     draw = ImageDraw.Draw(img)
 
     try:
-        font_name = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 28)
-        font_handle = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 22)
-        font_hook = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 34)
+        font_name = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 26)
+        font_handle = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
+        font_hook = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 33)
     except:
         font_name = ImageFont.load_default()
         font_handle = font_name
         font_hook = font_name
 
-    logo_size = 65
-    logo_x, logo_y = 12, 10
+    # Logo - circular, left side
+    logo_size = 55
+    logo_x, logo_y = 10, 8
     try:
         logo = Image.open('/app/logo.png').convert('RGBA')
         logo = logo.resize((logo_size, logo_size))
@@ -183,8 +190,9 @@ def create_overlay_image(hook_lines, width=720, height=200):
         mask_draw = ID.Draw(mask)
         mask_draw.ellipse((0, 0, logo_size, logo_size), fill=255)
         logo.putalpha(mask)
+        # Instagram gradient border
         draw.ellipse(
-            (logo_x - 3, logo_y - 3, logo_x + logo_size + 3, logo_y + logo_size + 3),
+            (logo_x - 2, logo_y - 2, logo_x + logo_size + 2, logo_y + logo_size + 2),
             outline='#E1306C', width=2
         )
         img.paste(logo, (logo_x, logo_y), logo)
@@ -192,12 +200,15 @@ def create_overlay_image(hook_lines, width=720, height=200):
         print(f"Logo error: {e}")
         draw.ellipse((logo_x, logo_y, logo_x + logo_size, logo_y + logo_size), fill='#FFD700')
 
-    name_x = logo_x + logo_size + 12
-    draw.text((name_x, logo_y + 6), "MillionDollarScenes™", font=font_name, fill='white')
+    # Name + blue checkmark
+    name_x = logo_x + logo_size + 10
+    draw.text((name_x, logo_y + 4), "MillionDollarScenes™", font=font_name, fill='white')
     check_w = draw.textlength("MillionDollarScenes™", font=font_name)
-    draw.text((name_x + check_w + 6, logo_y + 6), "✓", font=font_name, fill='#1DA1F2')
-    draw.text((name_x, logo_y + 36), "@MillionDollarScenes", font=font_handle, fill=(180, 180, 180, 255))
+    draw.text((name_x + check_w + 5, logo_y + 4), "✓", font=font_name, fill='#1DA1F2')
+    # Handle
+    draw.text((name_x, logo_y + 32), "@MillionDollarScenes", font=font_handle, fill=(170, 170, 170, 255))
 
+    # Hook text - tight, right above video
     word_colors = ['#FF4444', '#FFD700', '#44DDFF', '#FF8C00', '#44FF88']
     filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
               'from','is','it','he','she','they','his','her','their','was','were',
@@ -205,14 +216,14 @@ def create_overlay_image(hook_lines, width=720, height=200):
               'still','while','after','before','first','then','him','them','always',
               'never','ever','just','all','this','that','too'}
 
-    y_pos = 108
+    y_pos = 78
     for line in hook_lines:
         words = line.split()
         total_w = sum(draw.textlength(w + ' ', font=font_hook) for w in words)
-        x = max(10, (width - total_w) / 2)
+        x = max(8, (width - total_w) / 2)
         color_idx = 0
         for word in words:
-            clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊🔥🤝🫡😏')
+            clean = word.lower().rstrip('!?.,...💼🎯💰📈⚡☕💎🏆🎩👑💻🦈💵🌀⚖️🧠😤📊🔥🤝🫡😏🃏🚗')
             if clean in filler:
                 color = 'white'
             else:
@@ -221,7 +232,7 @@ def create_overlay_image(hook_lines, width=720, height=200):
             draw.text((x + 2, y_pos + 2), word + ' ', font=font_hook, fill=(0, 0, 0, 200))
             draw.text((x, y_pos), word + ' ', font=font_hook, fill=color)
             x += draw.textlength(word + ' ', font=font_hook)
-        y_pos += 46
+        y_pos += 40
 
     return img
 
@@ -249,32 +260,25 @@ def download():
 
         output_path = os.path.join(out_dir, 'final.mp4')
 
-        ffmpeg_cmd = [
+        # overlay height is 155px, video fills remaining 1125px of 1280
+ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-i', filepath,
             '-i', music_path,
             '-i', overlay_path,
             '-filter_complex',
-            '[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280[v];'
-            '[v][2:v]overlay=0:0[vt];'
+            '[0:v]scale=720:1125:force_original_aspect_ratio=increase,crop=720:1125[v];'
+            '[v]pad=720:1280:0:155:black[vp];'
+            '[2:v]scale=720:155[overlay];'
+            '[vp][overlay]overlay=0:0[vt];'
             '[0:a]volume=0.75[va];'
             '[1:a]volume=0.25[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
-            '-map', '[vt]',
-            '-map', '[aout]',
-            '-c:v', 'libx264',
-            '-c:a', 'aac',
-            '-shortest',
-            '-preset', 'ultrafast',
-            '-crf', '28',
-            '-fs', '45M',
-            output_path
-        ]
 
         proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=180)
         print(f"FFmpeg: {proc.returncode}")
         if proc.returncode != 0:
-            print(f"FFmpeg stderr: {proc.stderr[-300:]}")
+            print(f"FFmpeg stderr: {proc.stderr[-500:]}")
 
         final_path = output_path if os.path.exists(output_path) and os.path.getsize(output_path) > 10000 else filepath
         print(f"Final size: {os.path.getsize(final_path)}")
