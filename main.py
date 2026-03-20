@@ -261,9 +261,9 @@ def download():
             '-i', overlay_path,
             '-filter_complex',
             '[0:v]scale=720:1080:force_original_aspect_ratio=increase,crop=720:1080[v];'
-            '[v]pad=720:1280:0:175:black[vp];'
+            '[v]pad=720:1280:0:200:black[vp];'
             '[2:v]scale=720:155[overlay];'
-            '[vp][overlay]overlay=0:20[vt];'
+            '[vp][overlay]overlay=0:45[vt];'
             '[0:a]volume=0.75[va];'
             '[1:a]volume=0.25[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
