@@ -165,7 +165,7 @@ Respond ONLY with valid JSON:
     return random.choice(fallbacks)
 
 
-def create_overlay_image(hook_lines, width=720, height=155):
+def create_overlay_image(hook_lines, width=720, height=200):
     img = Image.new('RGBA', (width, height), (0, 0, 0, 255))
     draw = ImageDraw.Draw(img)
 
@@ -179,7 +179,7 @@ def create_overlay_image(hook_lines, width=720, height=155):
         font_hook = font_name
 
     logo_size = 55
-    logo_x, logo_y = 10, 8
+    logo_x, logo_y = 10, 10
     try:
         logo = Image.open('/app/logo.png').convert('RGBA')
         logo = logo.resize((logo_size, logo_size))
@@ -210,7 +210,7 @@ def create_overlay_image(hook_lines, width=720, height=155):
               'still','while','after','before','first','then','him','them','always',
               'never','ever','just','all','this','that','too'}
 
-    y_pos = 78
+    y_pos = 110
     for line in hook_lines:
         words = line.split()
         total_w = sum(draw.textlength(w + ' ', font=font_hook) for w in words)
@@ -226,7 +226,7 @@ def create_overlay_image(hook_lines, width=720, height=155):
             draw.text((x + 2, y_pos + 2), word + ' ', font=font_hook, fill=(0, 0, 0, 200))
             draw.text((x, y_pos), word + ' ', font=font_hook, fill=color)
             x += draw.textlength(word + ' ', font=font_hook)
-        y_pos += 40
+        y_pos += 42
 
     return img
 
@@ -262,8 +262,8 @@ def download():
             '-filter_complex',
             '[0:v]scale=720:1080:force_original_aspect_ratio=increase,crop=720:1080[v];'
             '[v]pad=720:1280:0:200:black[vp];'
-            '[2:v]scale=720:155[overlay];'
-            '[vp][overlay]overlay=0:45[vt];'
+            '[2:v]scale=720:200[overlay];'
+            '[vp][overlay]overlay=0:0[vt];'
             '[0:a]volume=0.75[va];'
             '[1:a]volume=0.25[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
