@@ -233,6 +233,28 @@ def create_overlay_image(hook_lines, width=720, height=OVERLAY_HEIGHT):
     return img
 
 
+def send_telegram_notification(video_path, hook_lines, youtube_url=''):
+    """Send video to Telegram as notification only - no buttons"""
+    try:
+        caption = '\n'.join(hook_lines)
+        msg = f"✅ Posted to YouTube!\n\n{caption}"
+        if youtube_url:
+            msg += f"\n\n🔗 {youtube_url}"
+
+        with open(video_path, 'rb') as f:
+            requests.post(
+                f'https://api.telegram.org/bot{BOT_TOKEN}/sendVideo',
+                data={
+                    'chat_id': CHAT_ID,
+                    'caption': msg,
+                },
+                files={'video': ('clip.mp4', f, 'video/mp4')},
+                timeout=120
+            )
+    except Exception as e:
+        print(f"Telegram notification error: {e}")
+
+
 @app.route('/download', methods=['POST'])
 def download():
     out_dir = tempfile.mkdtemp()
@@ -286,26 +308,6 @@ def download():
         final_path = output_path if os.path.exists(output_path) and os.path.getsize(output_path) > 10000 else filepath
         print(f"Final size: {os.path.getsize(final_path)}")
 
-        with open(final_path, 'rb') as f:
-            caption = '\n'.join(hook_lines)
-            tg = requests.post(
-                f'https://api.telegram.org/bot{BOT_TOKEN}/sendVideo',
-                data={
-                    'chat_id': CHAT_ID,
-                    'caption': f'{caption}\n\nPress POST or SKIP',
-                    'reply_markup': '{"inline_keyboard":[[{"text":"✅ POST","callback_data":"post"},{"text":"❌ SKIP","callback_data":"skip"}]]}'
-                },
-                files={'video': ('clip.mp4', f, 'video/mp4')},
-                timeout=120
-            )
-
-        if not tg.ok:
-            return jsonify({'error': 'Telegram failed', 'details': tg.text}), 500
-
-        tg_data = tg.json()
-        telegram_file_id = tg_data.get('result', {}).get('video', {}).get('file_id', '')
-        VIDEO_STORE[telegram_file_id] = final_path
-
         for p in [filepath, overlay_path]:
             if os.path.exists(p):
                 try: os.remove(p)
@@ -313,7 +315,6 @@ def download():
 
         return jsonify({
             'success': True,
-            'file_id': telegram_file_id,
             'hook': hook_lines,
             'video_path': final_path
         })
@@ -321,6 +322,22 @@ def download():
     except Exception as e:
         print(f"Exception: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/notify', methods=['POST'])
+def notify():
+    """Called by n8n after YouTube upload to send Telegram notification"""
+    data = request.json or {}
+    video_path = data.get('video_path', '')
+    hook = data.get('hook', [])
+    youtube_url = data.get('youtube_url', '')
+
+    if video_path and os.path.exists(video_path):
+        send_telegram_notification(video_path, hook, youtube_url)
+        try: os.remove(video_path)
+        except: pass
+
+    return jsonify({'success': True})
 
 
 @app.route('/get_video', methods=['GET'])
