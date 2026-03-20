@@ -68,7 +68,7 @@ VIDEO_STORE = {}
 
 OVERLAY_HEIGHT = 170
 VIDEO_HEIGHT = 900
-BOTTOM_BAR = 1280 - OVERLAY_HEIGHT - VIDEO_HEIGHT  # 210px black at bottom
+BOTTOM_BAR = 1280 - OVERLAY_HEIGHT - VIDEO_HEIGHT
 
 
 def download_gdrive_file(file_id, out_dir):
@@ -104,9 +104,9 @@ def generate_hook(filepath, out_dir, file_id):
             prompt = """You are creating a viral YouTube Short exactly like @biz.surgeon.
 
 STEP 1 - Look at this frame and identify EXACTLY:
-- Setting (car dealership, office, street, restaurant, gym, casino, courtroom, hotel, etc)
-- Characters (man in suit, athlete, couple, boss, salesman, etc)
-- What is literally happening (negotiating, arguing, celebrating, being rejected, making a deal, driving, counting money, etc)
+- Setting (car dealership, office, street, restaurant, gym, casino, courtroom, hotel, warehouse, etc)
+- Characters (man in suit, athlete, couple, boss, salesman, woman, etc)
+- What is literally happening (negotiating, arguing, celebrating, being rejected, making a deal, driving, counting money, walking through warehouse, etc)
 - Emotion (confident, shocked, determined, nervous, powerful, angry, calm, etc)
 
 STEP 2 - Write a 2-line hook that DIRECTLY matches what you see:
@@ -114,21 +114,21 @@ STEP 2 - Write a 2-line hook that DIRECTLY matches what you see:
 - Line 2 = the business/money/life lesson from that exact scene (ends with emoji)
 
 RULES:
-- Hook MUST match the visual scene — no generic hooks
+- Hook MUST match the visual scene
 - Car dealership → cars/wealth/deals
 - Boardroom/office → business/power/negotiation
+- Warehouse/storage → building wealth quietly
 - Street/outdoor → hustle/grind/success
 - Luxury setting → wealth/status/achievement
 - Capitalize Every Word, max 8 words per line
 
-EXAMPLES matched to scenes:
+EXAMPLES:
 Car dealership, man in sports car: "He Walked In And Chose The Best..." / "Money Was Never The Issue! 💰"
+Warehouse with shelves of gold: "She Walked Through Rows Of Gold..." / "And Nobody Even Knew Her Name! 💎"
 Two suits negotiating outside: "He Made The Offer They Couldn't Refuse..." / "That's How Real Deals Are Made! 🤝"
-Woman entering boardroom confidently: "She Walked In Like She Owned It..." / "Because She Actually Did! 👑"
-Man alone counting cash: "While They Were Sleeping..." / "He Was Already Counting! 💵"
-Hotel/corridor confrontation: "He Blocked Every Exit..." / "And Still Found The Way Out! 🔥"
+Woman entering boardroom: "She Walked In Like She Owned It..." / "Because She Actually Did! 👑"
 
-Respond ONLY with valid JSON, nothing else:
+Respond ONLY with valid JSON:
 {"hook": ["Line one setup...", "Line two lesson! 💰"]}"""
 
             response = requests.post(
@@ -174,7 +174,6 @@ Respond ONLY with valid JSON, nothing else:
 
 
 def create_overlay_image(hook_lines, width=720, height=OVERLAY_HEIGHT):
-    """Black banner - exact height, no wasted space"""
     img = Image.new('RGB', (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(img)
 
@@ -187,7 +186,6 @@ def create_overlay_image(hook_lines, width=720, height=OVERLAY_HEIGHT):
         font_handle = font_name
         font_hook = font_name
 
-    # Logo
     logo_size = 58
     logo_x, logo_y = 12, 8
     try:
@@ -203,14 +201,12 @@ def create_overlay_image(hook_lines, width=720, height=OVERLAY_HEIGHT):
     except Exception as e:
         print(f"Logo error: {e}")
 
-    # Name + checkmark + handle
     name_x = logo_x + logo_size + 12
     draw.text((name_x, logo_y + 5), "MillionDollarScenes™", font=font_name, fill='white')
     cw = draw.textlength("MillionDollarScenes™", font=font_name)
     draw.text((name_x + cw + 6, logo_y + 5), "✓", font=font_name, fill='#1DA1F2')
     draw.text((name_x, logo_y + 35), "@MillionDollarScenes", font=font_handle, fill=(170, 170, 170))
 
-    # Hook text - centered, right after logo row
     word_colors = ['#FF4444', '#FFD700', '#44DDFF', '#FF8C00', '#44FF88']
     filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
               'from','is','it','he','she','they','his','her','their','was','were',
@@ -258,24 +254,21 @@ def download():
         music_path = random.choice(MUSIC_TRACKS)
         output_path = os.path.join(out_dir, 'final.mp4')
 
-        # vstack: overlay (170px) + video (900px) + black bottom (210px) = 1280px
-        # Using vstack guarantees ZERO gap between overlay and video
         ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-i', filepath,
             '-i', music_path,
             '-i', overlay_path,
             '-filter_complex',
-            # Scale video to exactly 720x900
-            f'[0:v]scale=720:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,'
-            f'crop=720:{VIDEO_HEIGHT}[vid];'
-            # Add 210px black bar at bottom of video
+            # Scale video keeping aspect ratio - no stretching - black bars on sides
+            f'[0:v]scale=720:{VIDEO_HEIGHT}:force_original_aspect_ratio=decrease,'
+            f'pad=720:{VIDEO_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black[vid];'
+            # Add black bottom bar
             f'[vid]pad=720:{VIDEO_HEIGHT + BOTTOM_BAR}:0:0:black[vidpad];'
-            # Scale overlay to 720x170
+            # Scale overlay
             f'[2:v]scale=720:{OVERLAY_HEIGHT}[top];'
-            # Stack overlay on top of video — ZERO GAP GUARANTEED
+            # vstack = ZERO GAP between overlay and video
             f'[top][vidpad]vstack=inputs=2[vt];'
-            # Audio mix
             '[0:a]volume=0.75[va];'
             '[1:a]volume=0.25[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
