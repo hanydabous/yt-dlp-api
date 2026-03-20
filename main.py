@@ -110,22 +110,21 @@ STEP 2 - Write a 2-line hook where:
 - Line 2 delivers the business/money/life lesson that matches (ends with emoji)
 
 CRITICAL RULES:
-- The hook MUST match what you actually see — don't use generic hooks
-- If you see a car dealership scene → write about cars/deals/wealth
-- If you see an office/boardroom → write about business/power/negotiation  
-- If you see someone being confident → write about confidence/mindset
+- The hook MUST match what you actually see
+- If you see a car dealership → write about cars/deals/wealth
+- If you see an office/boardroom → write about business/power/negotiation
+- If you see someone confident → write about confidence/mindset
 - If you see money/luxury → write about wealth/success
 - Capitalize Every Word
 - Max 8 words per line
 - Line 1 ends with "..."
 - Line 2 ends with relevant emoji
 
-GOOD EXAMPLES matched to scenes:
-Car dealership with man sitting in sports car: "He Walked In And Chose The Best..." / "Money Was Never The Issue! 💰"
-Two men negotiating in suits outdoors: "He Made The Offer They Couldn't Refuse..." / "That's How Real Deals Are Made! 🤝"
-Woman confidently walking into boardroom: "She Walked In Like She Owned It..." / "Because She Actually Did! 👑"
-Man counting money alone: "While They Were Sleeping..." / "He Was Already Counting! 💵"
-Group celebrating a win: "They Said It Would Never Happen..." / "Until The Day It Did! 🔥"
+GOOD EXAMPLES:
+Car dealership man in sports car: "He Walked In And Chose The Best..." / "Money Was Never The Issue! 💰"
+Two men negotiating outdoors: "He Made The Offer They Couldn't Refuse..." / "That's How Real Deals Are Made! 🤝"
+Woman walking into boardroom: "She Walked In Like She Owned It..." / "Because She Actually Did! 👑"
+Man counting money: "While They Were Sleeping..." / "He Was Already Counting! 💵"
 
 Respond ONLY with valid JSON:
 {"hook": ["Line one...", "Line two! 💰"]}"""
@@ -172,21 +171,27 @@ Respond ONLY with valid JSON:
     return random.choice(fallbacks)
 
 
-def create_overlay_image(hook_lines, width=720, height=130):
+def create_overlay_image(hook_lines, width=720):
+    # Calculate exact height needed based on content
+    # Logo row: 65px, hook text: 2 lines x 42px = 84px, padding: 20px
+    # Total: 65 + 84 + 20 = 169px → use 170px
+    height = 170
+
     img = Image.new('RGBA', (width, height), (0, 0, 0, 255))
     draw = ImageDraw.Draw(img)
 
     try:
-        font_name = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 26)
-        font_handle = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
-        font_hook = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 33)
+        font_name = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 28)
+        font_handle = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 22)
+        font_hook = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 36)
     except:
         font_name = ImageFont.load_default()
         font_handle = font_name
         font_hook = font_name
 
-    logo_size = 55
-    logo_x, logo_y = 10, 5
+    # Logo row - compact
+    logo_size = 58
+    logo_x, logo_y = 12, 8
     try:
         logo = Image.open('/app/logo.png').convert('RGBA')
         logo = logo.resize((logo_size, logo_size))
@@ -204,12 +209,13 @@ def create_overlay_image(hook_lines, width=720, height=130):
         print(f"Logo error: {e}")
         draw.ellipse((logo_x, logo_y, logo_x + logo_size, logo_y + logo_size), fill='#FFD700')
 
-    name_x = logo_x + logo_size + 10
-    draw.text((name_x, logo_y + 2), "MillionDollarScenes™", font=font_name, fill='white')
+    name_x = logo_x + logo_size + 12
+    draw.text((name_x, logo_y + 5), "MillionDollarScenes™", font=font_name, fill='white')
     check_w = draw.textlength("MillionDollarScenes™", font=font_name)
-    draw.text((name_x + check_w + 5, logo_y + 2), "✓", font=font_name, fill='#1DA1F2')
-    draw.text((name_x, logo_y + 30), "@MillionDollarScenes", font=font_handle, fill=(170, 170, 170, 255))
+    draw.text((name_x + check_w + 6, logo_y + 5), "✓", font=font_name, fill='#1DA1F2')
+    draw.text((name_x, logo_y + 35), "@MillionDollarScenes", font=font_handle, fill=(170, 170, 170, 255))
 
+    # Hook text starts immediately after logo row
     word_colors = ['#FF4444', '#FFD700', '#44DDFF', '#FF8C00', '#44FF88']
     filler = {'the','a','an','in','of','to','and','but','or','for','with','at','by',
               'from','is','it','he','she','they','his','her','their','was','were',
@@ -217,7 +223,8 @@ def create_overlay_image(hook_lines, width=720, height=130):
               'still','while','after','before','first','then','him','them','always',
               'never','ever','just','all','this','that','too'}
 
-    y_pos = 60
+    # Hook text right after logo section
+    y_pos = 78
     for line in hook_lines:
         words = line.split()
         total_w = sum(draw.textlength(w + ' ', font=font_hook) for w in words)
@@ -233,9 +240,9 @@ def create_overlay_image(hook_lines, width=720, height=130):
             draw.text((x + 2, y_pos + 2), word + ' ', font=font_hook, fill=(0, 0, 0, 200))
             draw.text((x, y_pos), word + ' ', font=font_hook, fill=color)
             x += draw.textlength(word + ' ', font=font_hook)
-        y_pos += 38
+        y_pos += 44
 
-    return img
+    return img, height
 
 
 @app.route('/download', methods=['POST'])
@@ -252,12 +259,14 @@ def download():
         hook_lines = generate_hook(filepath, out_dir, file_id)
         print(f"Hook: {hook_lines}")
 
-        overlay_img = create_overlay_image(hook_lines)
+        overlay_img, overlay_height = create_overlay_image(hook_lines)
         overlay_path = os.path.join(out_dir, 'overlay.png')
         overlay_img.save(overlay_path)
 
+        video_height = 1280 - overlay_height  # exactly fills remaining space
+
         music_path = random.choice(MUSIC_TRACKS)
-        print(f"Using music: {music_path}")
+        print(f"Using music: {music_path}, overlay_height: {overlay_height}")
 
         output_path = os.path.join(out_dir, 'final.mp4')
 
@@ -267,10 +276,10 @@ def download():
             '-i', music_path,
             '-i', overlay_path,
             '-filter_complex',
-            '[0:v]scale=720:1150:force_original_aspect_ratio=increase,crop=720:1150[v];'
-            '[v]pad=720:1280:0:130:black[vp];'
-            '[2:v]scale=720:130[overlay];'
-            '[vp][overlay]overlay=0:0[vt];'
+            f'[0:v]scale=720:{video_height}:force_original_aspect_ratio=increase,crop=720:{video_height}[v];'
+            f'[v]pad=720:1280:0:{overlay_height}:black[vp];'
+            f'[2:v]scale=720:{overlay_height}[overlay];'
+            f'[vp][overlay]overlay=0:0[vt];'
             '[0:a]volume=0.75[va];'
             '[1:a]volume=0.25[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
