@@ -67,8 +67,7 @@ CLIP_IDS = [
 VIDEO_STORE = {}
 
 OVERLAY_HEIGHT = 170
-VIDEO_HEIGHT = 900
-BOTTOM_BAR = 1280 - OVERLAY_HEIGHT - VIDEO_HEIGHT
+VIDEO_HEIGHT = 1110
 
 
 def download_gdrive_file(file_id, out_dir):
@@ -106,7 +105,7 @@ def generate_hook(filepath, out_dir, file_id):
 STEP 1 - Look at this frame and identify EXACTLY:
 - Setting (car dealership, office, street, restaurant, gym, casino, courtroom, hotel, warehouse, etc)
 - Characters (man in suit, athlete, couple, boss, salesman, woman, etc)
-- What is literally happening (negotiating, arguing, celebrating, being rejected, making a deal, driving, counting money, walking through warehouse, etc)
+- What is literally happening (negotiating, arguing, celebrating, being rejected, making a deal, driving, counting money, etc)
 - Emotion (confident, shocked, determined, nervous, powerful, angry, calm, etc)
 
 STEP 2 - Write a 2-line hook that DIRECTLY matches what you see:
@@ -124,9 +123,10 @@ RULES:
 
 EXAMPLES:
 Car dealership, man in sports car: "He Walked In And Chose The Best..." / "Money Was Never The Issue! 💰"
-Warehouse with shelves of gold: "She Walked Through Rows Of Gold..." / "And Nobody Even Knew Her Name! 💎"
 Two suits negotiating outside: "He Made The Offer They Couldn't Refuse..." / "That's How Real Deals Are Made! 🤝"
 Woman entering boardroom: "She Walked In Like She Owned It..." / "Because She Actually Did! 👑"
+Man alone counting cash: "While They Were Sleeping..." / "He Was Already Counting! 💵"
+Tech startup pitch meeting: "He Pitched The Idea No One Believed..." / "Until It Made Him A Billionaire! 💻"
 
 Respond ONLY with valid JSON:
 {"hook": ["Line one setup...", "Line two lesson! 💰"]}"""
@@ -260,15 +260,10 @@ def download():
             '-i', music_path,
             '-i', overlay_path,
             '-filter_complex',
-            # Scale video keeping aspect ratio - no stretching - black bars on sides
             f'[0:v]scale=720:{VIDEO_HEIGHT}:force_original_aspect_ratio=decrease,'
             f'pad=720:{VIDEO_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black[vid];'
-            # Add black bottom bar
-            f'[vid]pad=720:{VIDEO_HEIGHT + BOTTOM_BAR}:0:0:black[vidpad];'
-            # Scale overlay
             f'[2:v]scale=720:{OVERLAY_HEIGHT}[top];'
-            # vstack = ZERO GAP between overlay and video
-            f'[top][vidpad]vstack=inputs=2[vt];'
+            f'[top][vid]vstack=inputs=2[vt];'
             '[0:a]volume=0.75[va];'
             '[1:a]volume=0.25[music];'
             '[va][music]amix=inputs=2:duration=first[aout]',
